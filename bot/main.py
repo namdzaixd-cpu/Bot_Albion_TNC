@@ -39,6 +39,7 @@ bot = TNCBot()
 
 @bot.event
 async def on_ready():
+    print(f"✅ Bot đã hoạt động: {bot.user} | ID: {bot.user.id}")
     print(f"🔍 [Check] ffmpeg path: {shutil.which('ffmpeg')}")
     print(f"✅ TNC Bot v40 [Siphoned + Massing + GuildCheck + ALO-TTS + CoreBank] Online! Session: {BOT_SESSION_ID}")
 
