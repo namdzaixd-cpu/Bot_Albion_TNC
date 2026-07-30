@@ -1,7 +1,7 @@
 # TNC Manager — Albion Online Guild Discord Bot
 
 Discord bot quản lý guild **TNC** trong game Albion Online. Bot chính viết bằng Python
-(`discord.py`), host trên Replit, kèm một pnpm workspace TypeScript đang trong giai đoạn
+(`discord.py`), được host online tại [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/), kèm một pnpm workspace TypeScript đang trong giai đoạn
 scaffold cho dashboard web trong tương lai.
 
 ## Cấu trúc dự án
@@ -62,8 +62,8 @@ Biến môi trường cần thiết (xem [bot/.env.example](bot/.env.example)):
 | `DISCORD_GUILD_ID` | ID server Discord |
 | `GITHUB_GIT_URL` | URL GitHub kèm Personal Access Token, dùng để auto-sync dữ liệu |
 
-Bot expose Flask server tại `http://localhost:5000`:
-- `GET /` — trạng thái bot (JSON)
+Bot expose Flask server tại `http://localhost:5000` (Online: [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/)):
+- `GET /` — Trang giới thiệu & trạng thái bot (HTML)
 - `GET /health` — health check
 
 ## Workspace TypeScript (pnpm)
