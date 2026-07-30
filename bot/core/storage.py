@@ -14,14 +14,14 @@ _git_lock = Lock()   # Lock dùng cho GitHub sync
 
 # Các file được đồng bộ lên GitHub mỗi khi có thay đổi (xem save_json(sync_github=True))
 GITHUB_SYNCED_FILES = [
-    "tnc_sp_v32.json",
-    "tnc_lastseen_v1.json",
-    "tnc_massing_v1.json",
-    "tnc_register_v1.json",
-    "tnc_guildcheck_v1.json",
-    "tnc_unresolved_v1.json",
-    "tnc_tts_config_v1.json",
-    "tnc_templates_v1.json",
+    "bot/tnc_sp_v32.json",
+    "bot/tnc_lastseen_v1.json",
+    "bot/tnc_massing_v1.json",
+    "bot/tnc_register_v1.json",
+    "bot/tnc_guildcheck_v1.json",
+    "bot/tnc_unresolved_v1.json",
+    "bot/tnc_tts_config_v1.json",
+    "bot/tnc_templates_v1.json",
 ]
 
 
