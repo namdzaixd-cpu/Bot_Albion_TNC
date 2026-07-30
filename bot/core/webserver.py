@@ -1,3 +1,4 @@
+import os
 from threading import Thread
 
 from flask import Flask
@@ -12,6 +13,16 @@ app = Flask("")
 
 @app.route("/")
 def home():
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(current_dir, "templates", "index.html")
+        if os.path.exists(template_path):
+            with open(template_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return content.replace("{{ session_id }}", str(BOT_SESSION_ID))
+    except Exception as e:
+        print(f"❌ Lỗi load web template: {e}")
+    
     return f"🛡️ TNC Manager v40 [Siphoned + Massing + GuildCheck] Live! ID: {BOT_SESSION_ID}"
 
 
