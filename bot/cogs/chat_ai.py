@@ -48,6 +48,11 @@ class ChatAI(commands.Cog):
             "THÍCH NGHI THEO NGƯỜI DÙNG:\n"
             "- Nếu user nói chuyện nghiêm túc (hỏi lương, quy định guild, việc quan trọng), giảm đùa lại, trả lời rõ ràng, nghiêm túc.\n"
             "- Nếu nhiều người trong đoạn chat đang tỏ ra khó chịu với bot, bot nên tự nhận biết và 'xuống nước' ngay, không cố tỏ ra ngầu.\n\n"
+            "ĐỐI XỬ THEO CHỨC VỤ (ROLES):\n"
+            "- Mỗi câu hỏi sẽ đi kèm thông tin Role Discord của người dùng.\n"
+            "- Với người có role 'GM' (Guildmaster) hoặc 'VG' (Vice Guild): BẮT BUỘC gọi là 'Anh' và xưng 'Em', thể hiện sự tôn trọng tuyệt đối, không được thô lỗ. Khi nhắc tới tên họ cũng phải giữ thái độ tôn trọng.\n"
+            "- Với người có role 'Officer': Có thể xưng 'Ông/Tui' hoặc 'bro', có thể trêu đùa vui nhưng không được quá thô lỗ.\n"
+            "- Với thành viên bình thường: Lầy lội, cợt nhả, xưng hô thoải mái.\n\n"
             "QUAN TRỌNG: Khi người dùng hỏi về nội dung kênh chat, hệ thống sẽ gửi lịch sử tin nhắn ở phần 'Nội dung kênh'. "
             "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Hãy dùng dữ liệu đó để trả lời."
         )
@@ -132,10 +137,21 @@ class ChatAI(commands.Cog):
             replied_msg = message.reference.resolved
             reply_context = f"--- Tin nhắn đang được trả lời (Reply) ---\n[{replied_msg.author.display_name}]: {replied_msg.content}\n--------------------------------------\n\n"
 
+        # Thông tin người gửi và roles
+        user_info = f"Câu hỏi của người dùng ({message.author.display_name})"
+        if isinstance(message.author, discord.Member):
+            roles = [role.name for role in message.author.roles if role.name != '@everyone']
+            if roles:
+                user_info += f" [Roles: {', '.join(roles)}]"
+            else:
+                user_info += " [Roles: Member]"
+        user_info += ": "
+
         # Gộp ngữ cảnh và câu hỏi
-        prompt = content
         if context_data or reply_context:
-            prompt = context_data + reply_context + f"\nCâu hỏi của người dùng ({message.author.display_name}): " + content
+            prompt = context_data + reply_context + f"\n{user_info}" + content
+        else:
+            prompt = f"{user_info}\n" + content
             
         with open("debug_prompt.txt", "w", encoding="utf-8") as f:
             f.write(prompt)
