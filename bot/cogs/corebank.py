@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime
+import aiohttp
 
 import discord
 from discord import app_commands
@@ -18,7 +19,7 @@ CORE_CREDITED_FILE = os.path.join(DATA_DIR, "tnc_core_credited_v1.json")
 
 
 def load_coreconfig():
-    return load_json(CORECONFIG_FILE, lambda: {"core_channel_id": "", "bank_channel_id": "", "emoji_map": {}})
+    return load_json(CORECONFIG_FILE, lambda: {"core_channel_id": "", "bank_channel_id": "", "unbelievaboat_token": "", "emoji_map": {}})
 
 
 def save_coreconfig(data):
@@ -134,6 +135,16 @@ class CoreBankCog(commands.Cog):
             ephemeral=True
         )
 
+    @app_commands.command(name="coretoken", description="Cài đặt API Token của UnbelievaBoat (Officer only)")
+    @app_commands.describe(token="API Token lấy từ trang chủ UnbelievaBoat")
+    async def coretoken_cmd(self, interaction: discord.Interaction, token: str):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
+        config = load_coreconfig()
+        config["unbelievaboat_token"] = token
+        save_coreconfig(config)
+        await interaction.response.send_message("✅ Đã cài đặt UnbelievaBoat API Token thành công!", ephemeral=True)
+
     @app_commands.command(name="coreadd", description="Thêm emoji Core với tên và giá trị silver tuỳ ý (Officer only)")
     @app_commands.describe(
         emoji="Emoji đại diện (unicode hoặc emoji server, vd: 🟢 hay <:ten:id>)",
@@ -189,13 +200,15 @@ class CoreBankCog(commands.Cog):
         emoji_map = config.get("emoji_map", {})
         core_ch = config.get("core_channel_id")
         bank_ch = config.get("bank_channel_id")
+        token = config.get("unbelievaboat_token", "")
         auto_react = config.get("auto_react", False)
 
         embed = discord.Embed(title="⚙️ Cấu hình Core-Bank", color=0xf1c40f)
         embed.add_field(
-            name="📌 Kênh",
+            name="📌 Kênh & Cấu hình",
             value=(f"📸 Core: {f'<#{core_ch}>' if core_ch else '_Chưa cài_'}\n"
                    f"💰 Bank: {f'<#{bank_ch}>' if bank_ch else '_Chưa cài_'}\n"
+                   f"🔑 Token API: **{'Đã cài ✅' if token else 'Chưa cài ❌'}**\n"
                    f"🤖 Tự động react ảnh: **{'BẬT ✅' if auto_react else 'TẮT ❌'}**"),
             inline=False
         )
@@ -287,8 +300,26 @@ class CoreBankCog(commands.Cog):
         }
         save_core_credited(credited)
 
-        # Gửi lệnh cho UnbelievaBoat
-        await bank_channel.send(f"!add-money {author.mention} {core_value}")
+        # Xử lý API UnbelievaBoat
+        token = config.get("unbelievaboat_token")
+        if not token:
+            await channel.send("⚠️ Chưa cài UnbelievaBoat API Token! Hãy dùng `/coretoken`.", reference=message)
+            return
+
+        api_url = f"https://unbelievaboat.com/api/v1/guilds/{payload.guild_id}/users/{author.id}"
+        headers = {"Authorization": token}
+        payload_data = {"bank": core_value, "reason": f"CoreBank: {core_name}"}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(api_url, headers=headers, json=payload_data) as resp:
+                    if resp.status not in (200, 204):
+                        err_text = await resp.text()
+                        await channel.send(f"⚠️ Lỗi API UnbelievaBoat ({resp.status}): {err_text}", reference=message)
+                        return
+        except Exception as e:
+            await channel.send(f"⚠️ Lỗi kết nối API UnbelievaBoat: {e}", reference=message)
+            return
 
         # Xác nhận dưới ảnh gốc
         await channel.send(
@@ -340,9 +371,17 @@ class CoreBankCog(commands.Cog):
         reactor = guild.get_member(payload.user_id)
         reactor_mention = reactor.mention if reactor else f"<@{payload.user_id}>"
 
-        bank_channel = guild.get_channel(int(bank_ch_id)) if bank_ch_id else None
-        if bank_channel:
-            await bank_channel.send(f"!remove-money {member_mention} {core_value}")
+        token = config.get("unbelievaboat_token")
+        if token:
+            api_url = f"https://unbelievaboat.com/api/v1/guilds/{payload.guild_id}/users/{entry['member_id']}"
+            headers = {"Authorization": token}
+            payload_data = {"bank": -core_value, "reason": f"CoreBank Revert: {core_name}"}
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.patch(api_url, headers=headers, json=payload_data):
+                        pass
+            except Exception:
+                pass
 
         channel = guild.get_channel(payload.channel_id)
         if channel:
