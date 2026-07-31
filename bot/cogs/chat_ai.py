@@ -68,10 +68,17 @@ class ChatAI(commands.Cog):
         # Kiểm tra xem bot có được tag, hoặc tin nhắn có phải là reply cho bot không
         is_mentioned = self.bot.user.mentioned_in(message)
         is_reply = False
-        if message.reference and message.reference.resolved:
-            if isinstance(message.reference.resolved, discord.Message):
-                if message.reference.resolved.author == self.bot.user:
-                    is_reply = True
+        
+        replied_msg = None
+        if message.reference:
+            replied_msg = message.reference.resolved
+            if replied_msg is None and message.reference.message_id:
+                try:
+                    replied_msg = await message.channel.fetch_message(message.reference.message_id)
+                except Exception as e:
+                    print(f"Lỗi fetch tin nhắn reply: {e}")
+            if isinstance(replied_msg, discord.Message) and replied_msg.author == self.bot.user:
+                is_reply = True
 
         if not (is_mentioned or is_reply):
             return
@@ -133,8 +140,7 @@ class ChatAI(commands.Cog):
 
         # Lấy nội dung tin nhắn được reply (nếu có)
         reply_context = ""
-        if message.reference and isinstance(message.reference.resolved, discord.Message):
-            replied_msg = message.reference.resolved
+        if isinstance(replied_msg, discord.Message):
             reply_context = f"--- Tin nhắn đang được trả lời (Reply) ---\n[{replied_msg.author.display_name}]: {replied_msg.content}\n--------------------------------------\n\n"
 
         # Thông tin người gửi và roles
