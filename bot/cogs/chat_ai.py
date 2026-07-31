@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR, OPENROUTER_API_KEY, OPENROUTER_MODEL
+from core.config import DATA_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
@@ -68,7 +68,11 @@ class ChatAI(commands.Cog):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị (Officer trở lên) mới được quyền đổi Model AI!", ephemeral=True)
             return
-            
+
+        if model_name not in self.available_models:
+            await interaction.response.send_message(f"⚠️ Model `{model_name}` không có trong danh sách! Dùng `/aimodel add` để thêm trước, hoặc chọn đúng model gợi ý trong autocomplete.", ephemeral=True)
+            return
+
         self.current_model = model_name
         self.ai_config["model"] = model_name
         save_json(self.ai_config, self.ai_config_file)
@@ -321,32 +325,67 @@ class ChatAI(commands.Cog):
         # Bật typing indicator
         async with message.channel.typing():
             try:
-                # Gọi OpenRouter API
-                payload = {
-                    "model": self.current_model,
-                    "messages": [
-                        {"role": "system", "content": self.system_instruction},
-                        {"role": "user", "content": prompt},
-                    ],
-                }
-                headers = {"Authorization": f"Bearer {self.api_key}"}
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
-                        try:
-                            data = await resp.json()
-                        except Exception:
-                            text_resp = await resp.text()
-                            data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+                is_gemini = self.current_model.startswith("google/")
 
-                        if resp.status == 429:
-                            error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
-                            await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API OpenRouter của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
-                            return
-                        elif resp.status != 200:
-                            error_msg = data.get("error", {}).get("message", "Unknown API Error")
-                            await message.reply(f"❌ Á đù, gọi API bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
-                            return
-                reply_text = data["choices"][0]["message"]["content"]
+                provider_name = "Gemini" if is_gemini else "OpenRouter"
+
+                if is_gemini:
+                    if not GEMINI_API_KEY:
+                        await message.reply("⚠️ Model hiện tại là Gemini nhưng chưa cấu hình `GEMINI_API_KEY` — đổi model khác bằng `/aimodel set` hoặc thêm key vào `.env`.")
+                        return
+                    gemini_model = self.current_model.split("/", 1)[1]
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={GEMINI_API_KEY}"
+                    payload = {
+                        "systemInstruction": {"parts": [{"text": self.system_instruction}]},
+                        "contents": [{"parts": [{"text": prompt}]}],
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload) as resp:
+                            try:
+                                data = await resp.json()
+                            except Exception:
+                                text_resp = await resp.text()
+                                data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+
+                            if resp.status == 429:
+                                error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
+                                await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API {provider_name} của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
+                                return
+                            elif resp.status != 200:
+                                error_msg = data.get("error", {}).get("message", "Unknown API Error")
+                                await message.reply(f"❌ Á đù, gọi API {provider_name} bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
+                                return
+                else:
+                    # Gọi OpenRouter API
+                    payload = {
+                        "model": self.current_model,
+                        "messages": [
+                            {"role": "system", "content": self.system_instruction},
+                            {"role": "user", "content": prompt},
+                        ],
+                    }
+                    headers = {"Authorization": f"Bearer {self.api_key}"}
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
+                            try:
+                                data = await resp.json()
+                            except Exception:
+                                text_resp = await resp.text()
+                                data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+
+                            if resp.status == 429:
+                                error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
+                                await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API {provider_name} của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
+                                return
+                            elif resp.status != 200:
+                                error_msg = data.get("error", {}).get("message", "Unknown API Error")
+                                await message.reply(f"❌ Á đù, gọi API {provider_name} bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
+                                return
+
+                if is_gemini:
+                    reply_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                else:
+                    reply_text = data["choices"][0]["message"]["content"]
 
                 # Discord giới hạn 2000 ký tự mỗi tin nhắn
                 if len(reply_text) <= 2000:
