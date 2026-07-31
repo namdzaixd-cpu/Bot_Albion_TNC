@@ -18,7 +18,7 @@ class ChatAI(commands.Cog):
             if os.path.exists(instruction_path):
                 try:
                     with open(instruction_path, "r", encoding="utf-8") as f:
-                        self.system_instruction = f.read()
+                        self.system_instruction = f.read().replace("{CURRENT_MODEL}", OPENROUTER_MODEL)
                 except Exception as e:
                     print(f"⚠️ Warning: Lỗi khi đọc file instruction: {e}. Sử dụng cấu hình mặc định.")
                     self.system_instruction = self._get_default_instruction()
@@ -202,7 +202,20 @@ class ChatAI(commands.Cog):
                 headers = {"Authorization": f"Bearer {self.api_key}"}
                 async with aiohttp.ClientSession() as session:
                     async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
-                        data = await resp.json()
+                        try:
+                            data = await resp.json()
+                        except Exception:
+                            text_resp = await resp.text()
+                            data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+
+                        if resp.status == 429:
+                            error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
+                            await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API OpenRouter của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\\nChi tiết: `{error_msg}`")
+                            return
+                        elif resp.status != 200:
+                            error_msg = data.get("error", {}).get("message", "Unknown API Error")
+                            await message.reply(f"❌ Á đù, gọi API bị lỗi rồi (Mã {resp.status})! 😬\\nChi tiết: `{error_msg}`")
+                            return
                 reply_text = data["choices"][0]["message"]["content"]
 
                 # Discord giới hạn 2000 ký tự mỗi tin nhắn
