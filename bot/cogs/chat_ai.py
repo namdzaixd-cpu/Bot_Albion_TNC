@@ -146,13 +146,22 @@ class ChatAI(commands.Cog):
         # Lấy thông tin Ban quản trị Guild
         guild_info = ""
         if message.guild:
-            gm_role = discord.utils.get(message.guild.roles, name="GM")
-            vg_role = discord.utils.get(message.guild.roles, name="VG")
-            officer_role = discord.utils.get(message.guild.roles, name="Officer")
+            gm_names = []
+            vg_names = []
+            officer_names = []
             
-            gm_names = [m.display_name for m in gm_role.members] if gm_role else []
-            vg_names = [m.display_name for m in vg_role.members] if vg_role else []
-            officer_names = [m.display_name for m in officer_role.members] if officer_role else []
+            for role in message.guild.roles:
+                r_name = role.name.lower()
+                if r_name == "gm" or "guild master" in r_name or "guildmaster" in r_name:
+                    gm_names.extend([m.display_name for m in role.members])
+                elif r_name == "vg" or "vice guild" in r_name:
+                    vg_names.extend([m.display_name for m in role.members])
+                elif "officer" in r_name:
+                    officer_names.extend([m.display_name for m in role.members])
+            
+            gm_names = list(set(gm_names))
+            vg_names = list(set(vg_names))
+            officer_names = list(set(officer_names))
             
             guild_info = f"--- Danh sách Ban quản trị Guild ---\n"
             guild_info += f"GM (Guild Master): {', '.join(gm_names) if gm_names else 'Chưa có dữ liệu'}\n"
