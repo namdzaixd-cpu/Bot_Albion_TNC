@@ -22,6 +22,22 @@ Nếu không chắc user đã chốt hay chưa, hỏi lại "Chốt chưa?" và 
 Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh giá, tìm bug mà không sửa) không cần qua
 gate này — chỉ áp dụng cho việc *viết/sửa* code.
 
+## Nguyên tắc code (Karpathy guidelines)
+
+Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
+
+1. **Nghĩ trước khi code** — không đoán mò, không giấu chỗ chưa rõ. Nếu có nhiều cách hiểu, nêu ra
+   cho user chọn thay vì tự ý chọn 1. Nếu có cách đơn giản hơn cách user đề xuất, nói thẳng.
+2. **Đơn giản trước tiên** — code tối thiểu đủ giải quyết đúng yêu cầu. Không thêm tính năng/
+   abstraction/config chưa ai yêu cầu. Không xử lý lỗi cho tình huống không thể xảy ra.
+3. **Sửa đúng phạm vi (surgical)** — chỉ đụng đúng chỗ cần sửa. Không tiện tay "cải thiện" code/
+   comment xung quanh không liên quan, không refactor lan man. Giữ nguyên style hiện có. Chỉ dọn
+   import/biến/hàm mồ côi do chính thay đổi của mình tạo ra — code chết có sẵn từ trước thì nêu ra
+   cho user biết, không tự ý xóa.
+4. **Làm theo tiêu chí kiểm chứng được** — biến yêu cầu mơ hồ thành tiêu chí rõ ràng, kiểm chứng
+   được (vd: "sửa bug" → tìm cách tái hiện bug, sửa, rồi xác nhận hết bug thay vì chỉ sửa theo cảm
+   tính).
+
 ## Về code
 
 - Code ngắn gọn, đủ tính năng, không dài dòng thừa.
@@ -31,6 +47,33 @@ gate này — chỉ áp dụng cho việc *viết/sửa* code.
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
   permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
+
+## Skills & Agents có sẵn trong dự án
+
+`.claude/skills/` — 16 skill từ [anthropics/skills](https://github.com/anthropics/skills) (chi tiết:
+`.claude/skills/README.md`). Dùng khi task khớp mô tả:
+
+- `algorithmic-art` — vẽ art sinh thuật toán bằng p5.js (seeded randomness, flow field, particle)
+- `brand-guidelines` — áp màu/font thương hiệu Anthropic vào artifact
+- `claude-api` — tra cứu Claude API/Anthropic SDK (model, giá, streaming, tool use, MCP, caching)
+- `doc-coauthoring` — quy trình đồng viết tài liệu/spec/decision doc cùng user
+- `docx` — tạo/đọc/sửa file Word (.docx/.dotx): mục lục, heading, tracked changes, ảnh, find-replace
+- `frontend-design` — gợi ý thiết kế UI/thẩm mỹ không rập khuôn (typography, màu sắc)
+- `internal-comms` — template báo cáo nội bộ, cập nhật lãnh đạo, báo cáo sự cố, FAQ
+- `mcp-builder` — hướng dẫn xây MCP server chất lượng cao (Python FastMCP hoặc Node/TS)
+- `pdf` — đọc/trích xuất/gộp/tách/xoay/watermark/điền form/OCR PDF
+- `pptx` — tạo/sửa PowerPoint (.pptx/.potx), template, ghi chú diễn giả
+- `skill-creator` — meta-skill để tạo/sửa/đánh giá skill khác
+- `slack-gif-creator` — tạo GIF động cho Slack (đúng kích thước/tối ưu)
+- `theme-factory` — áp theme màu/font có sẵn (hoặc tự tạo) cho artifact
+- `web-artifacts-builder` — xây artifact HTML phức tạp nhiều component (React/Tailwind/shadcn)
+- `webapp-testing` — test web app local bằng Playwright (screenshot, log, kiểm tra UI)
+- `xlsx` — tạo/sửa spreadsheet (.xlsx/.xlsm/.csv/.tsv): công thức, format, chart, dọn dữ liệu bẩn
+
+`.claude/agents/` — subagent riêng cho dự án, gọi qua Agent tool:
+
+- `python-reviewer` — review code Python (bảo mật, PEP8, type hint, concurrency, code quality)
+- `silent-failure-hunter` — săn lỗi nuốt exception / silent failure (vd: `except Exception: pass`)
 
 ## Ngôn ngữ & xưng hô
 
