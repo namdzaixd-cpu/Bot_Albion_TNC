@@ -143,6 +143,23 @@ class ChatAI(commands.Cog):
         if isinstance(replied_msg, discord.Message):
             reply_context = f"--- Tin nhắn đang được trả lời (Reply) ---\n[{replied_msg.author.display_name}]: {replied_msg.content}\n--------------------------------------\n\n"
 
+        # Lấy thông tin Ban quản trị Guild
+        guild_info = ""
+        if message.guild:
+            gm_role = discord.utils.get(message.guild.roles, name="GM")
+            vg_role = discord.utils.get(message.guild.roles, name="VG")
+            officer_role = discord.utils.get(message.guild.roles, name="Officer")
+            
+            gm_names = [m.display_name for m in gm_role.members] if gm_role else []
+            vg_names = [m.display_name for m in vg_role.members] if vg_role else []
+            officer_names = [m.display_name for m in officer_role.members] if officer_role else []
+            
+            guild_info = f"--- Danh sách Ban quản trị Guild ---\n"
+            guild_info += f"GM (Guild Master): {', '.join(gm_names) if gm_names else 'Chưa có dữ liệu'}\n"
+            guild_info += f"VG (Vice Guild): {', '.join(vg_names) if vg_names else 'Chưa có dữ liệu'}\n"
+            guild_info += f"Officer: {', '.join(officer_names) if officer_names else 'Chưa có dữ liệu'} (Tổng: {len(officer_names)})\n"
+            guild_info += "--------------------------------------\n\n"
+
         # Thông tin người gửi và roles
         user_info = f"Câu hỏi của người dùng ({message.author.display_name})"
         if isinstance(message.author, discord.Member):
@@ -154,8 +171,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if context_data or reply_context:
-            prompt = context_data + reply_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context:
+            prompt = guild_info + context_data + reply_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             
