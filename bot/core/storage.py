@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 import subprocess
-import time
 from threading import Lock, Thread
 
 from .config import BOT_SESSION_ID, GIT_URL
@@ -18,39 +17,12 @@ GITHUB_SYNCED_FILES = [
     "bot/tnc_sp_v32.json",
     "bot/tnc_lastseen_v1.json",
     "bot/tnc_massing_v1.json",
+    "bot/tnc_register_v1.json",
+    "bot/tnc_guildcheck_v1.json",
+    "bot/tnc_unresolved_v1.json",
     "bot/tnc_tts_config_v1.json",
     "bot/tnc_templates_v1.json",
 ]
-
-
-def pull_data_from_github():
-    """Pull các file data về từ GitHub khi bot khởi động (tránh mất data sau redeploy)."""
-    with _git_lock:
-        try:
-            subprocess.run(["git", "config", "user.name", "TNC_Data_Guard"], check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "guard@tnc-guild.com"], check=True, capture_output=True)
-            # Chỉ fetch, không merge toàn bộ — sau đó checkout từng file data
-            subprocess.run(["git", "fetch", GIT_URL, "main:refs/remotes/data_pull/main"],
-                           check=True, capture_output=True)
-            for rel_path in GITHUB_SYNCED_FILES:
-                res = subprocess.run(
-                    ["git", "show", f"refs/remotes/data_pull/main:{rel_path}"],
-                    capture_output=True, text=True, encoding="utf-8"
-                )
-                if res.returncode == 0 and res.stdout.strip():
-                    abs_path = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        *rel_path.split("/")[1:]  # bỏ prefix "bot/"
-                    )
-                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                    # Chỉ ghi nếu file chưa tồn tại hoặc file trống
-                    if not os.path.exists(abs_path) or os.path.getsize(abs_path) == 0:
-                        with open(abs_path, "w", encoding="utf-8") as f:
-                            f.write(res.stdout)
-                        print(f"✅ [Data-Guard] Đã khôi phục {rel_path} từ GitHub.")
-            print("✅ [Data-Guard] Hoàn tất pull data từ GitHub.")
-        except Exception as e:
-            print(f"⚠️ [Data-Guard] Không pull được data từ GitHub: {e}")
 
 
 def sync_to_github():
