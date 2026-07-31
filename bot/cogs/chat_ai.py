@@ -18,6 +18,11 @@ class ChatAI(commands.Cog):
         self.ai_config_file = os.path.join(DATA_DIR, "tnc_ai_config.json")
         self.ai_config = load_json(self.ai_config_file, dict)
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
+        self.available_models = self.ai_config.get("available_models", [
+            "google/gemini-3.5-flash-lite",
+            "google/gemini-2.5-flash",
+            "openai/gpt-4o-mini"
+        ])
         
         if self.api_key:
             # Đọc system instruction từ file template nếu có
@@ -35,13 +40,25 @@ class ChatAI(commands.Cog):
             print("⚠️ WARNING: OPENROUTER_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
             self.system_instruction = None
 
-    @app_commands.command(name="aimodel", description="Xem hoặc đổi model AI hiện tại")
-    @app_commands.describe(model_name="Nhập tên model mới (nếu muốn đổi). Để trống để xem model hiện tại.")
-    async def aimodel(self, interaction: discord.Interaction, model_name: str = None):
-        if not model_name:
-            await interaction.response.send_message(f"🧠 Bot đang sử dụng Model AI: **{self.current_model}**", ephemeral=False)
-            return
-            
+    aimodel_group = app_commands.Group(name="aimodel", description="Quản lý Model AI")
+
+    async def autocomplete_model(self, interaction: discord.Interaction, current: str):
+        models = self.available_models
+        return [
+            app_commands.Choice(name=m, value=m)
+            for m in models if current.lower() in m.lower()
+        ][:25]
+
+    @aimodel_group.command(name="view", description="Xem model đang sử dụng và danh sách model có sẵn")
+    async def aimodel_view(self, interaction: discord.Interaction):
+        model_list = "\n".join([f"- `{m}`" for m in self.available_models])
+        msg = f"🧠 **Model hiện tại:** `{self.current_model}`\n\n📝 **Danh sách model có sẵn:**\n{model_list}"
+        await interaction.response.send_message(msg, ephemeral=False)
+
+    @aimodel_group.command(name="set", description="Đổi model AI hiện tại")
+    @app_commands.describe(model_name="Chọn model từ danh sách thả xuống")
+    @app_commands.autocomplete(model_name=autocomplete_model)
+    async def aimodel_set(self, interaction: discord.Interaction, model_name: str):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị (Officer trở lên) mới được quyền đổi Model AI!", ephemeral=True)
             return
@@ -57,6 +74,41 @@ class ChatAI(commands.Cog):
                 self.system_instruction = f.read().replace("{CURRENT_MODEL}", self.current_model)
                 
         await interaction.response.send_message(f"✅ Đã đổi Model AI thành công sang: **{self.current_model}**", ephemeral=False)
+
+    @aimodel_group.command(name="add", description="Thêm một model mới vào danh sách")
+    @app_commands.describe(model_name="Tên model mới (VD: anthropic/claude-3.5-sonnet)")
+    async def aimodel_add(self, interaction: discord.Interaction, model_name: str):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
+            return
+            
+        if model_name in self.available_models:
+            await interaction.response.send_message(f"⚠️ Model `{model_name}` đã có trong danh sách rồi!", ephemeral=True)
+            return
+            
+        self.available_models.append(model_name)
+        self.ai_config["available_models"] = self.available_models
+        save_json(self.ai_config, self.ai_config_file)
+        
+        await interaction.response.send_message(f"✅ Đã thêm model `{model_name}` vào danh sách thành công!", ephemeral=False)
+
+    @aimodel_group.command(name="remove", description="Xóa một model khỏi danh sách")
+    @app_commands.describe(model_name="Chọn model cần xóa")
+    @app_commands.autocomplete(model_name=autocomplete_model)
+    async def aimodel_remove(self, interaction: discord.Interaction, model_name: str):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
+            return
+            
+        if model_name not in self.available_models:
+            await interaction.response.send_message(f"⚠️ Model `{model_name}` không có trong danh sách!", ephemeral=True)
+            return
+            
+        self.available_models.remove(model_name)
+        self.ai_config["available_models"] = self.available_models
+        save_json(self.ai_config, self.ai_config_file)
+        
+        await interaction.response.send_message(f"✅ Đã xóa model `{model_name}` khỏi danh sách!", ephemeral=False)
 
     def _get_default_instruction(self) -> str:
         return (
