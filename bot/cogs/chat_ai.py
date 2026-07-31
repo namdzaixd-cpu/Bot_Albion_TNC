@@ -4,9 +4,8 @@ import aiohttp
 import discord
 from discord.ext import commands
 
-from core.config import DATA_DIR, OPENROUTER_API_KEY
+from core.config import DATA_DIR, OPENROUTER_API_KEY, OPENROUTER_MODEL
 
-OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class ChatAI(commands.Cog):
