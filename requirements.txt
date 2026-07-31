@@ -34,3 +34,4 @@ gTTS
 PyNACl
 davey
 python-dotenv
+beautifulsoup4==4.12.3

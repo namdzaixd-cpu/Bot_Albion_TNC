@@ -1,6 +1,7 @@
 import os
 import re
 import aiohttp
+from bs4 import BeautifulSoup
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -139,6 +140,28 @@ class ChatAI(commands.Cog):
             "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Hãy dùng dữ liệu đó để trả lời."
         )
 
+    async def _fetch_url_content(self, url: str) -> str:
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=10) as resp:
+                    if resp.status != 200:
+                        return f"[Không thể cào dữ liệu từ link này. Mã lỗi HTTP: {resp.status}]"
+                    
+                    html_content = await resp.text()
+                    soup = BeautifulSoup(html_content, "html.parser")
+                    for script in soup(["script", "style"]):
+                        script.decompose()
+                        
+                    text = soup.get_text(separator="\n", strip=True)
+                    if len(text) > 15000:
+                        text = text[:15000] + "... [Đã cắt bớt do quá dài]"
+                    return text
+        except Exception as e:
+            return f"[Không thể đọc link này do lỗi: {e}]"
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         # Bỏ qua tin nhắn từ chính bot hoặc các bot khác
@@ -173,6 +196,19 @@ class ChatAI(commands.Cog):
         content = message.content.replace(f'<@{self.bot.user.id}>', '').strip()
         if not content:
             content = "Xin chào!"
+
+        # Tìm URLs và fetch nội dung
+        web_context = ""
+        urls = re.findall(r'(https?://[^\s]+)', content)
+        if urls:
+            await message.channel.typing()
+            web_context += "Dưới đây là nội dung từ các đường link được nhắc đến:\n\n"
+            for url in urls:
+                try:
+                    url_text = await self._fetch_url_content(url)
+                    web_context += f"--- Nội dung từ {url} ---\n{url_text}\n--------------------------------------\n\n"
+                except Exception:
+                    web_context += f"--- Lỗi khi đọc {url} ---\n\n"
 
         # Tìm các channel được tag trong tin nhắn (dạng <#123456789> hoặc dạng link discord.com/channels/guild/channel)
         channel_mentions = re.findall(r'<#(\d+)>', content)
@@ -262,8 +298,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context:
-            prompt = guild_info + context_data + reply_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context:
+            prompt = guild_info + context_data + reply_context + web_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             
@@ -309,8 +345,10 @@ class ChatAI(commands.Cog):
                         await message.reply(reply_text[i:i+2000])
 
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"OpenRouter API Error: {e}")
-                await message.reply("Xin lỗi, tôi đang gặp lỗi khi kết nối với AI hoặc xử lý yêu cầu này.")
+                await message.reply(f"Xin lỗi, tôi đang gặp lỗi khi kết nối với AI hoặc xử lý yêu cầu này.\nLỗi kỹ thuật: `{type(e).__name__}: {e}`")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ChatAI(bot))
