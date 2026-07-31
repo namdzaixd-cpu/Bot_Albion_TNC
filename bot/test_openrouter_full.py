@@ -14,7 +14,7 @@ if not OPENROUTER_API_KEY:
 
 instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
 with open(instruction_path, "r", encoding="utf-8") as f:
-    system_instruction = f.read()
+    system_instruction = f.read().replace("{CURRENT_MODEL}", OPENROUTER_MODEL)
 
 print(f"Model: {OPENROUTER_MODEL}")
 print(f"System instruction: {len(system_instruction)} ký tự")
