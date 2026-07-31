@@ -11,7 +11,7 @@ bot/                  Discord bot Python (thành phần chính, đang chạy pro
   main.py             Entry point: khởi tạo bot, load các cog, chạy keep_alive + bot.run
   core/               Hạ tầng dùng chung: config (env/const), storage (đọc/ghi JSON + sync GitHub),
                       permissions (is_officer), webserver (Flask keep-alive)
-  cogs/               Mỗi hệ thống tính năng là 1 Cog: siphoned, massing, lastseen,
+  cogs/               Mỗi hệ thống tính năng là 1 Cog: about, siphoned, massing, lastseen,
                       guildcheck, alo_tts, corebank
   *.json              Dữ liệu bot (điểm SP, massing, register, config...), tự backup .bak
 artifacts/
@@ -29,6 +29,7 @@ scripts/                 Script tiện ích dùng chung trong workspace
 
 | Hệ thống | Lệnh | Mô tả |
 |---|---|---|
+| **About** | `/aboutme` | Giới thiệu bot + link trang web (embed ngắn gọn) |
 | **Siphoned Points** | `/spupdate`, `/spcheck`, `!addsp`, `!removesp`, `!removesprole`, `!resetsp` | Parse file log `.txt` để cộng dồn điểm siphoned theo người chơi, bảng xếp hạng phân trang |
 | **Massing** | `/massing`, `/masstemplatelist`, `/masstemplatedelete` | Tạo party PVP/PVE theo role/weapon, UI nút bấm (join/kick/move/fill), lưu template, tự khôi phục sau restart |
 | **GuildCheck** | `/registertnc`, `/registerfor`, `/myign`, `/guildconfig`, `/guildcheck`, `/unresolved` | Đăng ký IGN Albion, tự kiểm tra qua Albion API xem còn trong guild không, tự xóa role nếu đã rời |

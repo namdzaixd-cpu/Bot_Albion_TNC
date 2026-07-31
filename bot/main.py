@@ -10,6 +10,7 @@ from core.webserver import keep_alive
 # KHỞI TẠO BOT CORE
 # ==============================================================================
 EXTENSIONS = [
+    "cogs.about",
     "cogs.siphoned",
     "cogs.massing",
     "cogs.lastseen",
