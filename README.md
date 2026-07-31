@@ -11,6 +11,7 @@ bot/                  Discord bot Python (thành phần chính, đang chạy pro
   main.py             Entry point: khởi tạo bot, load các cog, chạy keep_alive + bot.run
   core/               Hạ tầng dùng chung: config (env/const), storage (đọc/ghi JSON + sync GitHub),
                       permissions (is_officer), webserver (Flask keep-alive)
+    templates/        Templates dùng chung: trạng thái web (index.html), mô tả tính cách AI (chat_ai_instruction.txt)
   cogs/               Mỗi hệ thống tính năng là 1 Cog: about, siphoned, massing, lastseen,
                       guildcheck, alo_tts, corebank
   *.json              Dữ liệu bot (điểm SP, massing, register, config...), tự backup .bak
@@ -37,6 +38,11 @@ scripts/                 Script tiện ích dùng chung trong workspace
 | **Core-Bank** | `/coresetup`, `/coreadd`, `/coreremove`, `/coreautoreact`, `/corelist` | Tự động thả emoji reaction lên ảnh core nộp vào kênh, quy đổi ra giá trị silver |
 
 Phân quyền dựa theo **tên role Discord**: `officer`, `guild master`, `admin`, `phó hội`, `chủ hội`.
+## Cấu hình AI Chat
+
+Nội dung tính cách và hướng dẫn hành vi (system instruction) của bot NDZ được tách riêng trong file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt).
+- Bro có thể chỉnh sửa trực tiếp file text này để cập nhật tính cách, ranh giới ứng xử của bot.
+- Bot sẽ tự động đọc file này khi khởi động. Nếu file bị trống hoặc bị xóa, bot sẽ tự động sử dụng cấu hình mặc định (fallback) khai báo trong code.
 
 ## Lưu trữ dữ liệu
 

@@ -47,6 +47,7 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
   permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
+- Cấu hình AI Chat: Chỉ dẫn tính cách, prompt hệ thống nằm tại file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt). Chỉnh sửa file này thay vì sửa trực tiếp code Python trong cog.
 
 ## Skills & Agents có sẵn trong dự án
 
