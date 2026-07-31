@@ -23,6 +23,7 @@ EXTENSIONS = [
     "cogs.lastseen",
     "cogs.alo_tts",
     "cogs.corebank",
+    "cogs.chat_ai",
 ]
 
 
