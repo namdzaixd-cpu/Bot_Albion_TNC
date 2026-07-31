@@ -41,10 +41,15 @@ def sync_to_github():
                 capture_output=True, text=True,
             )
             if "nothing to commit" not in commit_res.stdout:
+                # Luôn pull --rebase trước khi push để tránh lỗi conflict nếu có người vừa push code
+                subprocess.run(["git", "pull", "--rebase", GIT_URL, "main"], check=False, capture_output=True)
                 subprocess.run(["git", "push", GIT_URL, "main"], check=True, capture_output=True)
                 print("📊 [Data-Guard] Đồng bộ GitHub thành công!")
             else:
                 print("📊 [Data-Guard] Không có thay đổi dữ liệu cần sao lưu.")
+        except subprocess.CalledProcessError as e:
+            err_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
+            print(f"❌ [Data-Guard] Lỗi Auto-Sync (Git Error): {err_msg}")
         except Exception as e:
             print(f"❌ [Data-Guard] Lỗi Auto-Sync: {e}")
 
