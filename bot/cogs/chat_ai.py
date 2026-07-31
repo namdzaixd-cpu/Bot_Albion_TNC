@@ -210,11 +210,11 @@ class ChatAI(commands.Cog):
 
                         if resp.status == 429:
                             error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
-                            await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API OpenRouter của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\\nChi tiết: `{error_msg}`")
+                            await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API OpenRouter của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
                             return
                         elif resp.status != 200:
                             error_msg = data.get("error", {}).get("message", "Unknown API Error")
-                            await message.reply(f"❌ Á đù, gọi API bị lỗi rồi (Mã {resp.status})! 😬\\nChi tiết: `{error_msg}`")
+                            await message.reply(f"❌ Á đù, gọi API bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
                             return
                 reply_text = data["choices"][0]["message"]["content"]
 
