@@ -232,6 +232,10 @@ class ChatAI(commands.Cog):
         
         all_channel_ids = list(set(channel_mentions + link_mentions))
         
+        # Luôn thêm kênh hiện tại vào để bot hiểu ngữ cảnh trò chuyện đang diễn ra
+        if str(message.channel.id) not in all_channel_ids:
+            all_channel_ids.append(str(message.channel.id))
+        
         context_data = ""
         if all_channel_ids:
             await message.channel.typing()
