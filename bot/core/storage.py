@@ -30,7 +30,11 @@ def sync_to_github():
         try:
             subprocess.run(["git", "config", "user.name", "TNC_Data_Guard"], check=True, capture_output=True)
             subprocess.run(["git", "config", "user.email", "guard@tnc-guild.com"], check=True, capture_output=True)
-            subprocess.run(["git", "add", *GITHUB_SYNCED_FILES], check=True, capture_output=True)
+            existing_files = [f for f in GITHUB_SYNCED_FILES if os.path.exists(f)]
+            if not existing_files:
+                print("📊 [Data-Guard] Không có file dữ liệu nào để sao lưu.")
+                return
+            subprocess.run(["git", "add", *existing_files], check=True, capture_output=True)
             commit_res = subprocess.run(
                 ["git", "commit", "-m", f"🤖 [Auto-Save] Session {BOT_SESSION_ID}"],
                 capture_output=True, text=True,
