@@ -1,7 +1,14 @@
 import shutil
+import sys
 
+# pyrefly: ignore [missing-import]
 import discord
 from discord.ext import commands
+
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding.lower() != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
 
 from core.config import BOT_SESSION_ID, GUILD_ID, TOKEN
 from core.webserver import keep_alive
@@ -14,7 +21,6 @@ EXTENSIONS = [
     "cogs.siphoned",
     "cogs.massing",
     "cogs.lastseen",
-    "cogs.guildcheck",
     "cogs.alo_tts",
     "cogs.corebank",
 ]
@@ -42,7 +48,7 @@ bot = TNCBot()
 async def on_ready():
     print(f"✅ Bot đã hoạt động: {bot.user} | ID: {bot.user.id}")
     print(f"🔍 [Check] ffmpeg path: {shutil.which('ffmpeg')}")
-    print(f"✅ TNC Bot v40 [Siphoned + Massing + GuildCheck + ALO-TTS + CoreBank] Online! Session: {BOT_SESSION_ID}")
+    print(f"✅ TNC Bot v40 [Siphoned + Massing + ALO-TTS + CoreBank] Online! Session: {BOT_SESSION_ID}")
 
 
 if __name__ == "__main__":

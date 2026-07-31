@@ -1,4 +1,5 @@
 import os
+import time
 
 import discord
 from discord import app_commands
@@ -6,7 +7,7 @@ from discord.ext import commands
 
 from core.config import DATA_DIR
 from core.permissions import is_officer
-from core.storage import load_json, save_json
+from core.storage import load_json, pull_data_from_github, save_json
 
 # ==============================================================================
 # HỆ THỐNG MASSING
@@ -542,6 +543,7 @@ class MassingModal(discord.ui.Modal, title="⚔️ Tạo Massing"):
         msg = await interaction.original_response()
         active_parties[str(msg.id)] = active_parties.pop(party_id)
         active_parties[str(msg.id)]["id"] = str(msg.id)
+        active_parties[str(msg.id)]["created_at"] = time.time()
         view.party_id = str(msg.id)
         save_massing()
         await msg.edit(embed=build_party_embed(active_parties[str(msg.id)]), view=view)
@@ -645,9 +647,26 @@ class MassingCog(commands.Cog):
 
     async def cog_load(self):
         """Khôi phục các party Massing sau khi bot restart (đăng ký lại nút với Discord)."""
+        # Bước 1: Pull data từ GitHub về nếu file chưa có hoặc trống (sau redeploy)
+        pull_data_from_github()
+
+        # Bước 2: Load party data
         loaded = load_massing()
         if not loaded:
             return
+
+        # Bước 3: Lọc bỏ party quá 7 ngày (168 giờ)
+        seven_days_ago = time.time() - 7 * 24 * 3600
+        stale_keys = []
+        for pid, party in loaded.items():
+            created_at = party.get("created_at")
+            if created_at is not None and created_at < seven_days_ago:
+                stale_keys.append(pid)
+        for pid in stale_keys:
+            del loaded[pid]
+        if stale_keys:
+            print(f"🗑️ [Massing] Đã xóa {len(stale_keys)} party cũ quá 7 ngày khi khởi động.")
+
         active_parties.update(loaded)
         restored = 0
         for pid in list(active_parties.keys()):
