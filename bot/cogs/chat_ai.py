@@ -29,7 +29,6 @@ class ChatAI(commands.Cog):
         ])
         
         if self.api_key:
-            # Đọc system instruction từ file template nếu có
             instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
             if os.path.exists(instruction_path):
                 try:
@@ -198,6 +197,8 @@ class ChatAI(commands.Cog):
 
         if not (is_mentioned or is_reply):
             return
+
+        self._reload_config()
 
         if not self.api_key:
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
