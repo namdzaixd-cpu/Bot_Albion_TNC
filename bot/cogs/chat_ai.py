@@ -126,10 +126,16 @@ class ChatAI(commands.Cog):
                 except Exception as e:
                     context_data += f"--- LỖI KHI TÌM KÊNH <#{channel_id_str}>: {e} ---\n\n"
 
+        # Lấy nội dung tin nhắn được reply (nếu có)
+        reply_context = ""
+        if message.reference and isinstance(message.reference.resolved, discord.Message):
+            replied_msg = message.reference.resolved
+            reply_context = f"--- Tin nhắn đang được trả lời (Reply) ---\n[{replied_msg.author.display_name}]: {replied_msg.content}\n--------------------------------------\n\n"
+
         # Gộp ngữ cảnh và câu hỏi
         prompt = content
-        if context_data:
-            prompt = context_data + f"\nCâu hỏi của người dùng ({message.author.display_name}): " + content
+        if context_data or reply_context:
+            prompt = context_data + reply_context + f"\nCâu hỏi của người dùng ({message.author.display_name}): " + content
             
         with open("debug_prompt.txt", "w", encoding="utf-8") as f:
             f.write(prompt)
