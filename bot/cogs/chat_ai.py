@@ -20,7 +20,7 @@ class ChatAI(commands.Cog):
                 "QUAN TRỌNG: Khi người dùng hỏi về nội dung kênh chat, hệ thống sẽ gửi lịch sử tin nhắn ở phần 'Nội dung kênh'. "
                 "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Hãy dùng dữ liệu đó để trả lời."
             )
-            self.model = genai.GenerativeModel('gemma-4-31b-it', system_instruction=system_instruction)
+            self.model = genai.GenerativeModel('gemini-3.5-flash-lite', system_instruction=system_instruction)
         else:
             print("⚠️ WARNING: GEMINI_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
             self.model = None
