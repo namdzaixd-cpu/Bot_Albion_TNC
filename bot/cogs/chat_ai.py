@@ -2,9 +2,12 @@ import os
 import re
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from core.config import DATA_DIR, OPENROUTER_API_KEY, OPENROUTER_MODEL
+from core.permissions import is_officer
+from core.storage import load_json, save_json
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -12,13 +15,17 @@ class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api_key = OPENROUTER_API_KEY
+        self.ai_config_file = os.path.join(DATA_DIR, "tnc_ai_config.json")
+        self.ai_config = load_json(self.ai_config_file, dict)
+        self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
+        
         if self.api_key:
             # Đọc system instruction từ file template nếu có
             instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
             if os.path.exists(instruction_path):
                 try:
                     with open(instruction_path, "r", encoding="utf-8") as f:
-                        self.system_instruction = f.read().replace("{CURRENT_MODEL}", OPENROUTER_MODEL)
+                        self.system_instruction = f.read().replace("{CURRENT_MODEL}", self.current_model)
                 except Exception as e:
                     print(f"⚠️ Warning: Lỗi khi đọc file instruction: {e}. Sử dụng cấu hình mặc định.")
                     self.system_instruction = self._get_default_instruction()
@@ -27,6 +34,29 @@ class ChatAI(commands.Cog):
         else:
             print("⚠️ WARNING: OPENROUTER_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
             self.system_instruction = None
+
+    @app_commands.command(name="aimodel", description="Xem hoặc đổi model AI hiện tại")
+    @app_commands.describe(model_name="Nhập tên model mới (nếu muốn đổi). Để trống để xem model hiện tại.")
+    async def aimodel(self, interaction: discord.Interaction, model_name: str = None):
+        if not model_name:
+            await interaction.response.send_message(f"🧠 Bot đang sử dụng Model AI: **{self.current_model}**", ephemeral=False)
+            return
+            
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị (Officer trở lên) mới được quyền đổi Model AI!", ephemeral=True)
+            return
+            
+        self.current_model = model_name
+        self.ai_config["model"] = model_name
+        save_json(self.ai_config, self.ai_config_file)
+        
+        # Reload instruction
+        instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
+        if os.path.exists(instruction_path):
+            with open(instruction_path, "r", encoding="utf-8") as f:
+                self.system_instruction = f.read().replace("{CURRENT_MODEL}", self.current_model)
+                
+        await interaction.response.send_message(f"✅ Đã đổi Model AI thành công sang: **{self.current_model}**", ephemeral=False)
 
     def _get_default_instruction(self) -> str:
         return (
@@ -193,7 +223,7 @@ class ChatAI(commands.Cog):
             try:
                 # Gọi OpenRouter API
                 payload = {
-                    "model": OPENROUTER_MODEL,
+                    "model": self.current_model,
                     "messages": [
                         {"role": "system", "content": self.system_instruction},
                         {"role": "user", "content": prompt},

@@ -22,6 +22,7 @@ GITHUB_SYNCED_FILES = [
     "bot/tnc_unresolved_v1.json",
     "bot/tnc_tts_config_v1.json",
     "bot/tnc_templates_v1.json",
+    "bot/tnc_ai_config.json",
 ]
 
 
