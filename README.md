@@ -68,6 +68,7 @@ Biến môi trường cần thiết (xem [bot/.env.example](bot/.env.example)):
 | `DISCORD_TOKEN` | Token bot Discord |
 | `DISCORD_GUILD_ID` | ID server Discord |
 | `GITHUB_GIT_URL` | URL GitHub kèm Personal Access Token, dùng để auto-sync dữ liệu |
+| `OPENROUTER_API_KEY` | API key OpenRouter, dùng cho tính năng chat AI (cog `chat_ai`) |
 
 Bot expose Flask server tại `http://localhost:5000` (Online: [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/)):
 - `GET /` — Trang giới thiệu & trạng thái bot (HTML)

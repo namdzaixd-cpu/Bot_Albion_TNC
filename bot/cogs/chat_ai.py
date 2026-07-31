@@ -1,32 +1,33 @@
 import os
 import re
+import aiohttp
 import discord
 from discord.ext import commands
-import google.generativeai as genai
 
-from core.config import DATA_DIR, GEMINI_API_KEY
+from core.config import DATA_DIR, OPENROUTER_API_KEY
+
+OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        if GEMINI_API_KEY:
-            genai.configure(api_key=GEMINI_API_KEY)
+        self.api_key = OPENROUTER_API_KEY
+        if self.api_key:
             # Đọc system instruction từ file template nếu có
             instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
             if os.path.exists(instruction_path):
                 try:
                     with open(instruction_path, "r", encoding="utf-8") as f:
-                        system_instruction = f.read()
+                        self.system_instruction = f.read()
                 except Exception as e:
                     print(f"⚠️ Warning: Lỗi khi đọc file instruction: {e}. Sử dụng cấu hình mặc định.")
-                    system_instruction = self._get_default_instruction()
+                    self.system_instruction = self._get_default_instruction()
             else:
-                system_instruction = self._get_default_instruction()
-
-            self.model = genai.GenerativeModel('gemini-3.5-flash-lite', system_instruction=system_instruction)
+                self.system_instruction = self._get_default_instruction()
         else:
-            print("⚠️ WARNING: GEMINI_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
-            self.model = None
+            print("⚠️ WARNING: OPENROUTER_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
+            self.system_instruction = None
 
     def _get_default_instruction(self) -> str:
         return (
@@ -83,7 +84,7 @@ class ChatAI(commands.Cog):
         if not (is_mentioned or is_reply):
             return
 
-        if not self.model:
+        if not self.api_key:
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
             return
 
@@ -165,10 +166,20 @@ class ChatAI(commands.Cog):
         # Bật typing indicator
         async with message.channel.typing():
             try:
-                # Gọi Gemini API
-                response = self.model.generate_content(prompt)
-                reply_text = response.text
-                
+                # Gọi OpenRouter API
+                payload = {
+                    "model": OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": self.system_instruction},
+                        {"role": "user", "content": prompt},
+                    ],
+                }
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
+                        data = await resp.json()
+                reply_text = data["choices"][0]["message"]["content"]
+
                 # Discord giới hạn 2000 ký tự mỗi tin nhắn
                 if len(reply_text) <= 2000:
                     await message.reply(reply_text)
@@ -176,9 +187,9 @@ class ChatAI(commands.Cog):
                     # Nếu tin nhắn quá dài, cắt nhỏ ra để gửi
                     for i in range(0, len(reply_text), 2000):
                         await message.reply(reply_text[i:i+2000])
-                        
+
             except Exception as e:
-                print(f"Gemini API Error: {e}")
+                print(f"OpenRouter API Error: {e}")
                 await message.reply("Xin lỗi, tôi đang gặp lỗi khi kết nối với AI hoặc xử lý yêu cầu này.")
 
 async def setup(bot: commands.Bot):
