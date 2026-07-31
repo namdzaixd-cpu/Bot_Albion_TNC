@@ -16,6 +16,9 @@ class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api_key = OPENROUTER_API_KEY
+        self._reload_config()
+        
+    def _reload_config(self):
         self.ai_config_file = os.path.join(DATA_DIR, "tnc_ai_config.json")
         self.ai_config = load_json(self.ai_config_file, dict)
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
@@ -44,6 +47,7 @@ class ChatAI(commands.Cog):
     aimodel_group = app_commands.Group(name="aimodel", description="Quản lý Model AI")
 
     async def autocomplete_model(self, interaction: discord.Interaction, current: str):
+        self._reload_config()
         models = self.available_models
         return [
             app_commands.Choice(name=m, value=m)
@@ -52,6 +56,7 @@ class ChatAI(commands.Cog):
 
     @aimodel_group.command(name="view", description="Xem model đang sử dụng và danh sách model có sẵn")
     async def aimodel_view(self, interaction: discord.Interaction):
+        self._reload_config()
         model_list = "\n".join([f"- `{m}`" for m in self.available_models])
         msg = f"🧠 **Model hiện tại:** `{self.current_model}`\n\n📝 **Danh sách model có sẵn:**\n{model_list}"
         await interaction.response.send_message(msg, ephemeral=False)
@@ -60,6 +65,7 @@ class ChatAI(commands.Cog):
     @app_commands.describe(model_name="Chọn model từ danh sách thả xuống")
     @app_commands.autocomplete(model_name=autocomplete_model)
     async def aimodel_set(self, interaction: discord.Interaction, model_name: str):
+        self._reload_config()
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị (Officer trở lên) mới được quyền đổi Model AI!", ephemeral=True)
             return
@@ -79,6 +85,7 @@ class ChatAI(commands.Cog):
     @aimodel_group.command(name="add", description="Thêm một model mới vào danh sách")
     @app_commands.describe(model_name="Tên model mới (VD: anthropic/claude-3.5-sonnet)")
     async def aimodel_add(self, interaction: discord.Interaction, model_name: str):
+        self._reload_config()
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
             return
@@ -97,6 +104,7 @@ class ChatAI(commands.Cog):
     @app_commands.describe(model_name="Chọn model cần xóa")
     @app_commands.autocomplete(model_name=autocomplete_model)
     async def aimodel_remove(self, interaction: discord.Interaction, model_name: str):
+        self._reload_config()
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
             return
