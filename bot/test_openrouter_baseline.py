@@ -1,23 +1,19 @@
-"""Script test độ trễ OpenRouter API (kèm system instruction thật) — chạy: python bot/test_gemini_latency.py"""
+"""Script test API + model OpenRouter, KHÔNG có system instruction — chạy: python bot/test_openrouter_baseline.py"""
 import json
-import os
 import time
 import urllib.error
 import urllib.request
 
-from core.config import DATA_DIR, OPENROUTER_API_KEY, OPENROUTER_MODEL
+from core.config import OPENROUTER_API_KEY, OPENROUTER_MODEL
 
+API_KEY = OPENROUTER_API_KEY
+MODEL = OPENROUTER_MODEL
 URL = "https://openrouter.ai/api/v1/chat/completions"
 
-if not OPENROUTER_API_KEY:
+if not API_KEY:
     raise SystemExit("Thiếu OPENROUTER_API_KEY trong .env")
 
-instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
-with open(instruction_path, "r", encoding="utf-8") as f:
-    system_instruction = f.read()
-
-print(f"Model: {OPENROUTER_MODEL}")
-print(f"System instruction: {len(system_instruction)} ký tự")
+print(f"Model: {MODEL}")
 print("Gõ câu hỏi rồi Enter (Ctrl+C để thoát):\n")
 
 while True:
@@ -26,18 +22,15 @@ while True:
         continue
 
     body = json.dumps({
-        "model": OPENROUTER_MODEL,
-        "messages": [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": question},
-        ],
+        "model": MODEL,
+        "messages": [{"role": "user", "content": question}],
     }).encode("utf-8")
 
     req = urllib.request.Request(
         URL,
         data=body,
         headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json",
         },
         method="POST",

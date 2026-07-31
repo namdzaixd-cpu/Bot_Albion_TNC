@@ -40,9 +40,26 @@ scripts/                 Script tiện ích dùng chung trong workspace
 Phân quyền dựa theo **tên role Discord**: `officer`, `guild master`, `admin`, `phó hội`, `chủ hội`.
 ## Cấu hình AI Chat
 
-Nội dung tính cách và hướng dẫn hành vi (system instruction) của bot NDZ được tách riêng trong file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt).
-- Bro có thể chỉnh sửa trực tiếp file text này để cập nhật tính cách, ranh giới ứng xử của bot.
-- Bot sẽ tự động đọc file này khi khởi động. Nếu file bị trống hoặc bị xóa, bot sẽ tự động sử dụng cấu hình mặc định (fallback) khai báo trong code.
+Cog `chat_ai` gọi model qua OpenRouter (`https://openrouter.ai/api/v1/chat/completions`).
+
+- **Tính cách bot**: sửa trực tiếp file text [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt) — không cần đụng code. Bot tự đọc file này lúc khởi động, nên sửa xong phải **restart bot** mới áp dụng. Nếu file trống hoặc bị xóa, bot fallback về cấu hình mặc định khai báo trong `chat_ai.py`.
+- **Đổi model**: sửa biến `OPENROUTER_MODEL` trong `.env` (local) hoặc Environment Variables trên Render (production) — không cần sửa code. Render tự restart khi lưu biến env mới.
+
+### Test AI chat ngoài Discord
+
+2 script độc lập trong `bot/`, cùng lấy `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` từ `.env` qua `core/config.py` (đổi model/key ở `.env` thì cả 2 script lẫn bot chính đều dùng chung giá trị mới):
+
+| File | Công dụng |
+|---|---|
+| `bot/test_openrouter_full.py` | Gọi kèm system instruction thật từ `chat_ai_instruction.txt` — mô phỏng đúng điều kiện production |
+| `bot/test_openrouter_baseline.py` | Gọi trần, không có system instruction — đo độ trễ gốc của API/model, dùng để so sánh xem prompt tính cách có làm chậm phản hồi hay không |
+
+```bash
+python bot/test_openrouter_full.py
+python bot/test_openrouter_baseline.py
+```
+
+Gõ câu hỏi rồi Enter, script in ra `[X.XXs] <câu trả lời>` — số giây là thời gian phản hồi thật từ OpenRouter, không qua Discord.
 
 ## Lưu trữ dữ liệu
 
@@ -69,6 +86,7 @@ Biến môi trường cần thiết (xem [bot/.env.example](bot/.env.example)):
 | `DISCORD_GUILD_ID` | ID server Discord |
 | `GITHUB_GIT_URL` | URL GitHub kèm Personal Access Token, dùng để auto-sync dữ liệu |
 | `OPENROUTER_API_KEY` | API key OpenRouter, dùng cho tính năng chat AI (cog `chat_ai`) |
+| `OPENROUTER_MODEL` | Model OpenRouter dùng cho chat AI (để trống sẽ dùng model mặc định trong code) |
 
 Bot expose Flask server tại `http://localhost:5000` (Online: [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/)):
 - `GET /` — Trang giới thiệu & trạng thái bot (HTML)

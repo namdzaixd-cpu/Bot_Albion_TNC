@@ -33,5 +33,4 @@ yarl==1.23.0
 gTTS
 PyNACl
 davey
-google-generativeai
 python-dotenv
