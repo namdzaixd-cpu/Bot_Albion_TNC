@@ -23,7 +23,7 @@ def load_coreconfig():
 
 
 def save_coreconfig(data):
-    save_json(data, CORECONFIG_FILE, sync_github=False)
+    save_json(data, CORECONFIG_FILE)
 
 
 def load_core_credited():
@@ -31,7 +31,7 @@ def load_core_credited():
 
 
 def save_core_credited(data):
-    save_json(data, CORE_CREDITED_FILE, sync_github=False)
+    save_json(data, CORE_CREDITED_FILE)
 
 
 def parse_emoji_input(emoji_str: str):
