@@ -74,6 +74,10 @@ class AboutCog(commands.Cog):
             title="🛡️ TNC Manager",
             description=(
                 "Bot quản lý Guild **TNC** trong Albion Online.\n\n"
+                "🏆 **Credits & Tác giả:**\n"
+                "🔹 **N4MDZ4I**: Phát triển nền tảng và các tính năng cốt lõi (Massing, Siphoned...)\n"
+                "🔹 **Kudo2ten**: Phát triển mảng Chat AI\n"
+                "🔹 **Twot**: Tối ưu & hoàn thiện hệ thống\n\n"
                 f"🌐 [Trang giới thiệu]({WEBSITE_URL})"
             ),
             color=0x3498db,
@@ -81,15 +85,6 @@ class AboutCog(commands.Cog):
         for name, value in FEATURE_FIELDS:
             embed.add_field(name=name, value=value, inline=False)
             
-        embed.add_field(
-            name="🏆 Credits & Tác giả",
-            value=(
-                "🔹 **N4MDZ4I**: Phát triển nền tảng và các tính năng cốt lõi (Massing, Siphoned...)\n"
-                "🔹 **Kudo2ten**: Phát triển mảng Chat AI\n"
-                "🔹 **Twot**: Tối ưu & hoàn thiện hệ thống"
-            ),
-            inline=False
-        )
 
         if interaction.guild and interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
