@@ -7,6 +7,10 @@ from discord.ext import commands
 # ==============================================================================
 WEBSITE_URL = "https://bot-albion-tnc.onrender.com/"
 
+# ==============================================================================
+# LƯU Ý CHO DEV/AI: Mỗi khi code thêm tính năng/lệnh mới, BẮT BUỘC phải 
+# cập nhật danh sách FEATURE_FIELDS này để lệnh /aboutme luôn chính xác.
+# ==============================================================================
 FEATURE_FIELDS = [
     (
         "💎 Siphoned Points",
@@ -50,6 +54,13 @@ FEATURE_FIELDS = [
         "`/coreautoreact` (bật/tắt auto-react — Officer)\n"
         "`/corelist` (xem danh sách core)",
     ),
+    (
+        "🧠 AI Chat",
+        "`/aimodel view` (xem model)\n"
+        "`/aimodel set` (đổi model — Officer)\n"
+        "`/aimodel add` (thêm model — Officer)\n"
+        "`/aimodel remove` (xóa model — Officer)",
+    ),
 ]
 
 
@@ -69,8 +80,22 @@ class AboutCog(commands.Cog):
         )
         for name, value in FEATURE_FIELDS:
             embed.add_field(name=name, value=value, inline=False)
-        if self.bot.user:
+            
+        embed.add_field(
+            name="🏆 Credits & Tác giả",
+            value=(
+                "🔹 **N4MDZ4I**: Phát triển nền tảng và các tính năng cốt lõi (Massing, Siphoned...)\n"
+                "🔹 **Kudo2ten**: Phát triển mảng Chat AI\n"
+                "🔹 **Twot**: Tối ưu & hoàn thiện hệ thống"
+            ),
+            inline=False
+        )
+
+        if interaction.guild and interaction.guild.icon:
+            embed.set_thumbnail(url=interaction.guild.icon.url)
+        elif self.bot.user:
             embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+            
         await interaction.response.send_message(embed=embed)
 
 
