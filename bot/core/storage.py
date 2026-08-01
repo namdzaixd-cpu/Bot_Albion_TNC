@@ -56,6 +56,25 @@ def sync_to_github():
             print(f"❌ [Data-Guard] Lỗi Auto-Sync: {e}")
 
 
+def restore_from_github():
+    """Kéo file dữ liệu JSON từ GitHub về máy sau khi Render deploy container mới.
+    Chỉ checkout đúng các file trong GITHUB_SYNCED_FILES, không merge/rebase code.
+    Đảm bảo Storage luôn có data mới nhất dù filesystem ephemeral."""
+    try:
+        subprocess.run(["git", "fetch", "origin", "main"], check=True, capture_output=True)
+        for filepath in GITHUB_SYNCED_FILES:
+            subprocess.run(
+                ["git", "checkout", "origin/main", "--", filepath],
+                check=False, capture_output=True
+            )
+        print("📥 [Data-Guard] Đã khôi phục dữ liệu từ GitHub thành công!")
+    except subprocess.CalledProcessError as e:
+        err_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
+        print(f"⚠️ [Data-Guard] Không thể khôi phục từ GitHub: {err_msg} — dùng data local nếu có.")
+    except Exception as e:
+        print(f"⚠️ [Data-Guard] Lỗi restore: {e}")
+
+
 def load_json(path, default):
     """Đọc file JSON, tự fallback sang bản `.bak` nếu file chính thiếu hoặc lỗi."""
     for try_path in (path, path + ".bak"):

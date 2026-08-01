@@ -2,7 +2,7 @@ import os
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from core.config import STORAGE_DIR
 from core.permissions import is_officer
@@ -658,6 +658,23 @@ class MassingCog(commands.Cog):
             except Exception as e:
                 print(f"⚠️ Không khôi phục được party {pid}: {e}")
         print(f"🔄 Đã khôi phục {restored} party Massing sau restart!")
+        self.weekly_clear_parties.start()  # Bắt đầu task tự dọn party hàng tuần
+
+    async def cog_unload(self):
+        self.weekly_clear_parties.cancel()
+
+    @tasks.loop(hours=168)  # 7 ngày = 168 giờ
+    async def weekly_clear_parties(self):
+        """Tự động xóa toàn bộ party Massing đang active mỗi 7 ngày.
+        Templates không bị đụng — chỉ xóa được bằng /masstemplatedelete."""
+        count = len(active_parties)
+        active_parties.clear()
+        save_massing()
+        print(f"🧹 [Auto-Clean] Đã xóa {count} party Massing cũ sau 7 ngày.")
+
+    @weekly_clear_parties.before_loop
+    async def before_weekly_clear(self):
+        await self.bot.wait_until_ready()
 
     async def template_autocomplete(self, interaction: discord.Interaction, current: str):
         templates = load_templates()

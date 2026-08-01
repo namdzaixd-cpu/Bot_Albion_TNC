@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 
 from core.config import BOT_SESSION_ID, GUILD_ID, TOKEN
+from core.storage import restore_from_github
 from core.webserver import keep_alive
 
 # ==============================================================================
@@ -27,6 +28,7 @@ class TNCBot(commands.Bot):
         super().__init__(command_prefix=["!", "."], intents=intents, help_command=None)
 
     async def setup_hook(self):
+        restore_from_github()  # Kéo data JSON từ GitHub về trước khi load cog
         for extension in EXTENSIONS:
             await self.load_extension(extension)
 
