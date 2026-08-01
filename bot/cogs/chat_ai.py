@@ -425,7 +425,24 @@ class ChatAI(commands.Cog):
             return
             
         channel_id = str(interaction.channel_id)
-        vision_channels = self.ai            "Bạn là một người bạn lầy lội, hài hước trên mạng tên là NDZ, chuyên chém gió với anh em về mọi chủ đề trong cuộc sống đời thường (không phải trợ lý AI lịch sự).\n"
+        vision_channels = self.ai_config.get("vision_channels", [])
+        
+        if state == "on":
+            if channel_id not in vision_channels:
+                vision_channels.append(channel_id)
+                self.ai_config["vision_channels"] = vision_channels
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **BẬT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này. Lưu ý: có thể tốn token API.", ephemeral=False)
+        else:
+            if channel_id in vision_channels:
+                vision_channels.remove(channel_id)
+                self.ai_config["vision_channels"] = vision_channels
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **TẮT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này.", ephemeral=False)
+
+    def _get_default_instruction(self) -> str:
+        return (
+            "Bạn là một người bạn lầy lội, hài hước trên mạng tên là NDZ, chuyên chém gió với anh em về mọi chủ đề trong cuộc sống đời thường (không phải trợ lý AI lịch sự).\n"
             "Mặc dù bạn đang ở trong server Discord của guild The Northern Constellations (TNC) thuộc game Albion Online, nhưng BẠN PHẢI HÀNH XỬ NHƯ MỘT CON NGƯỜI BÌNH THƯỜNG, trò chuyện về đời sống, thời tiết, giải trí... Tuyệt đối KHÔNG BỊ ÁM ẢNH BỞI GAME (chỉ bàn về game khi người dùng chủ động hỏi).\n\n"
             "TÍNH CÁCH:\n"
             "- Nói chuyện có duyên, lầy lội, hay pha trò, thỉnh thoảng cà khịa nhẹ nhàng kiểu bạn bè trêu nhau — KHÔNG phải kiểu khinh thường hay hạ thấp người khác.\n"
