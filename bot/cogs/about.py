@@ -59,7 +59,9 @@ FEATURE_FIELDS = [
         "`/aimodel view` (xem model)\n"
         "`/aimodel set` (đổi model — Officer)\n"
         "`/aimodel add` (thêm model — Officer)\n"
-        "`/aimodel remove` (xóa model — Officer)",
+        "`/aimodel remove` (xóa model — Officer)\n"
+        "`/aimodel buffer` (chỉnh bộ nhớ đệm — Officer)\n"
+        "`/aimodel intercept` (bật/tắt nói leo — Officer)",
     ),
 ]
 

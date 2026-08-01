@@ -18,12 +18,23 @@ class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api_key = OPENROUTER_API_KEY
-        self.message_buffers = collections.defaultdict(lambda: collections.deque(maxlen=30))
+        self.message_buffers = {}
         self._reload_config()
+        
+    def get_buffer(self, channel_id_str):
+        if channel_id_str not in self.message_buffers:
+            size = self.ai_config.get("channel_buffers", {}).get(channel_id_str, 50)
+            self.message_buffers[channel_id_str] = collections.deque(maxlen=size)
+        return self.message_buffers[channel_id_str]
         
     def _reload_config(self):
         self.ai_config_file = os.path.join(DATA_DIR, "tnc_ai_config.json")
         self.ai_config = load_json(self.ai_config_file, dict)
+        if "channel_buffers" not in self.ai_config:
+            self.ai_config["channel_buffers"] = {}
+        if "intercept_channels" not in self.ai_config:
+            self.ai_config["intercept_channels"] = []
+            
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
         self.available_models = self.ai_config.get("available_models", [
             "google/gemini-3.5-flash-lite",
@@ -125,6 +136,55 @@ class ChatAI(commands.Cog):
         
         await interaction.response.send_message(f"✅ Đã xóa model `{model_name}` khỏi danh sách!", ephemeral=False)
 
+    @aimodel_group.command(name="buffer", description="Chỉnh số tin nhắn bot lưu đệm ở kênh hiện tại")
+    @app_commands.describe(size="Số lượng tin nhắn (Mặc định 50, kênh đông khuyên dùng 100)")
+    async def aimodel_buffer(self, interaction: discord.Interaction, size: int):
+        self._reload_config()
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
+            return
+            
+        if size < 10 or size > 300:
+            await interaction.response.send_message("⚠️ Số lượng tin nhắn hợp lý là từ 10 đến 300.", ephemeral=True)
+            return
+            
+        channel_id = str(interaction.channel_id)
+        self.ai_config["channel_buffers"][channel_id] = size
+        save_json(self.ai_config, self.ai_config_file)
+        
+        # Reset buffer for this channel
+        self.message_buffers[channel_id] = collections.deque(maxlen=size)
+        
+        await interaction.response.send_message(f"✅ Kênh này đã được chỉnh để ghi nhớ **{size}** tin nhắn gần nhất.", ephemeral=False)
+
+    @aimodel_group.command(name="intercept", description="Bật/Tắt tính năng bot tự động nói leo ngẫu nhiên")
+    @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
+    @app_commands.choices(state=[
+        app_commands.Choice(name="Bật (On)", value="on"),
+        app_commands.Choice(name="Tắt (Off)", value="off")
+    ])
+    async def aimodel_intercept(self, interaction: discord.Interaction, state: str):
+        self._reload_config()
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
+            return
+            
+        channel_id = str(interaction.channel_id)
+        intercepts = self.ai_config.get("intercept_channels", [])
+        
+        if state == "on":
+            if channel_id not in intercepts:
+                intercepts.append(channel_id)
+                self.ai_config["intercept_channels"] = intercepts
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **BẬT** tính năng hóng hớt (Nói leo ngẫu nhiên 2%) cho kênh này.", ephemeral=False)
+        else:
+            if channel_id in intercepts:
+                intercepts.remove(channel_id)
+                self.ai_config["intercept_channels"] = intercepts
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
+
     def _get_default_instruction(self) -> str:
         return (
             "Bạn là 1 con bot Discord của guild The Northern Constellations (TNC) trong game Albion Online, đóng vai 1 game thủ hài hước — không phải trợ lý AI lịch sự kiểu văn phòng.\n"
@@ -186,7 +246,7 @@ class ChatAI(commands.Cog):
             return
 
         # Ghi nhớ tin nhắn vào bộ nhớ đệm của kênh
-        self.message_buffers[str(message.channel.id)].append({
+        self.get_buffer(str(message.channel.id)).append({
             "author": message.author.display_name,
             "content": message.content
         })
@@ -215,10 +275,19 @@ class ChatAI(commands.Cog):
         if any(kw in content_lower for kw in trigger_keywords):
             is_keyword_trigger = True
             
+        is_random_intercept = False
+        channel_id_str = str(message.channel.id)
+        self._reload_config() # Reload early for intercept_channels
+        
         if not (is_mentioned or is_reply or is_keyword_trigger):
-            return
+            if channel_id_str in self.ai_config.get("intercept_channels", []):
+                game_keywords = ["gank", "albion", "t6", "t7", "t8", "đền set", "chết", "massing", "cta", "ip"]
+                if any(kw in content_lower for kw in game_keywords):
+                    if random.random() < 0.02: # 2% chance
+                        is_random_intercept = True
 
-        self._reload_config()
+        if not (is_mentioned or is_reply or is_keyword_trigger or is_random_intercept):
+            return
 
         if not self.api_key:
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
@@ -265,8 +334,9 @@ class ChatAI(commands.Cog):
                     if hasattr(channel, 'history'):
                         context_data += f"--- Nội dung kênh #{getattr(channel, 'name', 'unknown')} ---\n"
                         
-                        if channel_id_str in self.message_buffers and len(self.message_buffers[channel_id_str]) > 0:
-                            for msg_dict in self.message_buffers[channel_id_str]:
+                        buffer = self.get_buffer(channel_id_str)
+                        if len(buffer) > 0:
+                            for msg_dict in buffer:
                                 context_data += f"[{msg_dict['author']}]: {msg_dict['content']}\n"
                         else:
                             msg_count = 0
@@ -342,6 +412,9 @@ class ChatAI(commands.Cog):
             prompt = guild_info + context_data + reply_context + web_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
+            
+        if is_random_intercept:
+            prompt += "\n\n[HỆ THỐNG]: Bạn đang tự động nhảy vào nói leo (không ai gọi bạn). HÃY TRẢ LỜI CỰC KỲ NGẮN GỌN (1-2 CÂU), MANG TÍNH CHẤT GÓP VUI, TẤU HÀI HOẶC CÀ KHỊA CHÚT ĐỈNH. TUYỆT ĐỐI KHÔNG DÀI DÒNG HAY GIÁO HUẤN."
             
         with open("debug_prompt.txt", "w", encoding="utf-8") as f:
             f.write(prompt)
