@@ -691,7 +691,10 @@ class ChatAI(commands.Cog):
         or_content = [{"type": "text", "text": prompt}]
         has_images = False
         
-        if message.attachments:
+        vision_channels = self.ai_config.get("vision_channels", [])
+        is_vision_enabled = channel_id_str in vision_channels
+        
+        if message.attachments and is_vision_enabled:
             for att in message.attachments:
                 if att.content_type and att.content_type.startswith('image/'):
                     b64_img = await self._image_to_base64(att.url)

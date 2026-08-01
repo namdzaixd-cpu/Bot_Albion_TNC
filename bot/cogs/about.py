@@ -63,6 +63,7 @@ FEATURE_FIELDS = [
         "`/aimodel buffer` (chỉnh bộ nhớ đệm — Officer)\n"
         "`/aimodel intercept` (bật/tắt nói leo — Officer)\n"
         "`/aimodel autowiki` (bật tắt tra Wiki tự động — Officer)\n"
+        "`/aimodel vision` (bật tắt đọc ảnh trong kênh chat — Officer)\n"
         "`/aimodel library_set` (đặt kênh thư viện — Officer)\n"
         "`/aimodel library_scan` (quét thư viện RAG — Officer)\n"
         "`/wiki` (tra cứu Wiki Albion thủ công)",
