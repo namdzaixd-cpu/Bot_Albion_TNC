@@ -203,15 +203,15 @@ class ChatAI(commands.Cog):
             await interaction.followup.send(f"❌ Có lỗi xảy ra khi kiểm tra số dư: {e}")
 
     @aimodel_group.command(name="buffer", description="Chỉnh số tin nhắn bot lưu đệm ở kênh hiện tại")
-    @app_commands.describe(size="Số lượng tin nhắn (Mặc định 50, kênh đông khuyên dùng 100)")
+    @app_commands.describe(size="Số lượng tin nhắn (Mặc định 20, khuyên dùng <= 50 để tiết kiệm token)")
     async def aimodel_buffer(self, interaction: discord.Interaction, size: int):
         self._reload_config()
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
             
-        if size < 10 or size > 300:
-            await interaction.response.send_message("⚠️ Số lượng tin nhắn hợp lý là từ 10 đến 300.", ephemeral=True)
+        if size < 5 or size > 100:
+            await interaction.response.send_message("⚠️ Số lượng tin nhắn hợp lý là từ 5 đến 100 để tránh ngốn API và quá tải Bot.", ephemeral=True)
             return
             
         channel_id = str(interaction.channel_id)
@@ -539,6 +539,10 @@ class ChatAI(commands.Cog):
                     if resp.status != 200:
                         return f"[Không thể cào dữ liệu từ link này. Mã lỗi HTTP: {resp.status}]"
                     
+                    content_type = resp.headers.get("Content-Type", "").lower()
+                    if "text/html" not in content_type and "text/plain" not in content_type:
+                        return f"[Link này không chứa văn bản (Content-Type: {content_type}), bot tự động chặn để đảm bảo an toàn.]"
+                    
                     html_content = await resp.text()
                     soup = BeautifulSoup(html_content, "html.parser")
                     for script in soup(["script", "style"]):
@@ -560,7 +564,7 @@ class ChatAI(commands.Cog):
         # Ghi nhớ tin nhắn vào bộ nhớ đệm của kênh
         channel_id_str = str(message.channel.id)
         if channel_id_str not in self.message_buffers:
-            size = self.ai_config.get("channel_buffers", {}).get(channel_id_str, 50)
+            size = self.ai_config.get("channel_buffers", {}).get(channel_id_str, 20)
             self.message_buffers[channel_id_str] = collections.deque(maxlen=size)
             try:
                 hist = []
@@ -883,13 +887,15 @@ class ChatAI(commands.Cog):
                 else:
                     reply_text = data["choices"][0]["message"]["content"]
 
+                allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
+
                 # Discord giới hạn 2000 ký tự mỗi tin nhắn
                 if len(reply_text) <= 2000:
-                    await message.reply(reply_text)
+                    await message.reply(reply_text, allowed_mentions=allowed_mentions)
                 else:
                     # Nếu tin nhắn quá dài, cắt nhỏ ra để gửi
                     for i in range(0, len(reply_text), 2000):
-                        await message.reply(reply_text[i:i+2000])
+                        await message.reply(reply_text[i:i+2000], allowed_mentions=allowed_mentions)
 
             except Exception as e:
                 import traceback
