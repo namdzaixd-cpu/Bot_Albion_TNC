@@ -382,14 +382,17 @@ class ChatAI(commands.Cog):
         if isinstance(replied_msg, discord.Message):
             reply_context = f"--- Tin nhắn đang được trả lời (Reply) ---\n[{replied_msg.author.display_name}]: {replied_msg.content}\n--------------------------------------\n\n"
 
-        # Lấy thông tin Ban quản trị Guild
+        # Lấy thông tin Ban quản trị Guild và thống kê Role
         guild_info = ""
         if message.guild:
             gm_names = []
             vg_names = []
             officer_names = []
+            role_counts = []
             
             for role in message.guild.roles:
+                if role.name == '@everyone':
+                    continue
                 r_name = role.name.lower()
                 if r_name == "gm" or "guild master" in r_name or "guildmaster" in r_name:
                     gm_names.extend([m.display_name for m in role.members])
@@ -397,15 +400,22 @@ class ChatAI(commands.Cog):
                     vg_names.extend([m.display_name for m in role.members])
                 elif "officer" in r_name:
                     officer_names.extend([m.display_name for m in role.members])
+                
+                if len(role.members) > 0:
+                    role_counts.append(f"'{role.name}' ({len(role.members)})")
             
             gm_names = list(set(gm_names))
             vg_names = list(set(vg_names))
             officer_names = list(set(officer_names))
             
-            guild_info = f"--- Danh sách Ban quản trị Guild ---\n"
-            guild_info += f"GM (Guild Master): {', '.join(gm_names) if gm_names else 'Chưa có dữ liệu'}\n"
-            guild_info += f"VG (Vice Guild): {', '.join(vg_names) if vg_names else 'Chưa có dữ liệu'}\n"
-            guild_info += f"Officer: {', '.join(officer_names) if officer_names else 'Chưa có dữ liệu'} (Tổng: {len(officer_names)})\n"
+            guild_info = f"--- Dữ liệu Server (dùng để trả lời nếu được hỏi) ---\n"
+            guild_info += f"Tổng thành viên server: {message.guild.member_count}\n"
+            guild_info += f"Danh sách GM: {', '.join(gm_names) if gm_names else 'Không có'}\n"
+            guild_info += f"Danh sách VG: {', '.join(vg_names) if vg_names else 'Không có'}\n"
+            guild_info += f"Danh sách Officer: {', '.join(officer_names) if officer_names else 'Không có'}\n"
+            
+            if role_counts:
+                guild_info += f"Thống kê số lượng thành viên của từng Role: {', '.join(role_counts)}\n"
             guild_info += "--------------------------------------\n\n"
 
         # Thông tin người gửi và roles
