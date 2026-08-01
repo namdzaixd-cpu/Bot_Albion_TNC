@@ -17,3 +17,16 @@ Mỗi khi lập trình thêm tính năng hoặc lệnh mới cho Bot, BẮT BU�
 2. Import `STORAGE_DIR` từ `bot/core/config.py`
 3. Thêm đường dẫn vào `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`
 4. Đọc `bot/Storage/README.md` để biết danh sách file hiện có trước khi tạo mới
+
+# LUẬT KHỞI ĐỘNG BOT (TRÁNH PHÂN THÂN)
+Tuyệt đối không được tuỳ tiện chạy lệnh `python bot/main.py` dưới nền (background tasks) liên tục.
+**TRƯỚC KHI KHỞI ĐỘNG BOT ĐỂ TEST:**
+1. Phải chạy lệnh liệt kê các tiến trình đang chạy (dùng tool `manage_task` action `list`).
+2. Nếu phát hiện có tiến trình bot nào đang chạy dưới nền, BẮT BUỘC phải `kill` nó trước.
+3. Đảm bảo chỉ có duy nhất 1 luồng bot hoạt động tại mọi thời điểm để tránh spam Discord và xung đột ghi file / tự động commit.
+
+# LUẬT COMMIT CODE TỰ ĐỘNG BẰNG PYTHON (GIT AUTHOR)
+Tuyệt đối KHÔNG dùng các lệnh như `git config user.name ...` hoặc `git config user.email ...` trong code để đổi tên người commit. 
+Việc này sẽ làm hỏng cấu hình Git cục bộ (local git config) của User.
+Thay vào đó, chỉ được phép ghi đè thông tin tác giả trực tiếp trên từng commit bằng cờ `--author`, ví dụ:
+`git commit --author="TNC_Data_Guard <guard@tnc-guild.com>" -m "..."`
