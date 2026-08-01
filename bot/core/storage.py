@@ -2,7 +2,7 @@ import json
 import os
 import shutil
 import subprocess
-from threading import Lock, Thread
+from threading import Lock, Thread, Timer
 
 from .config import BOT_SESSION_ID, GIT_URL
 
@@ -11,6 +11,9 @@ from .config import BOT_SESSION_ID, GIT_URL
 # ==============================================================================
 _file_lock = Lock()  # Lock dùng cho đọc/ghi file JSON (chống race condition)
 _git_lock = Lock()   # Lock dùng cho GitHub sync
+
+_sync_timer = None
+_SYNC_DELAY = 60.0  # Chờ 60 giây im lặng trước khi đẩy lên GitHub
 
 # Các file được đồng bộ lên GitHub mỗi khi có thay đổi (xem save_json(sync_github=True))
 GITHUB_SYNCED_FILES = [
@@ -99,5 +102,15 @@ def save_json(data, path, sync_github=True):
         if os.path.exists(path):
             shutil.copy2(path, path + ".bak")
         os.replace(tmp_path, path)
+        
     if sync_github:
-        Thread(target=sync_to_github).start()
+        global _sync_timer
+        with _git_lock:
+            if _sync_timer is not None:
+                _sync_timer.cancel()
+            _sync_timer = Timer(_SYNC_DELAY, _trigger_sync)
+            _sync_timer.start()
+
+def _trigger_sync():
+    Thread(target=sync_to_github).start()
+
