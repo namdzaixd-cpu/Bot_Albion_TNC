@@ -110,8 +110,7 @@ class OfficerApprovalView(discord.ui.View):
         c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "Kênh Hỏi đáp"
         
         welcome_msg = (
-            f"🎉 Chào mừng <@{self.target_user_id}> đã gia nhập TNC! (Bot đã tự động đổi tên Discord giúp bạn).\n"
-            f"Vui lòng nộp đơn (apply) vào guild **The Northern Constellations** trong game và đợi một lát để Officer duyệt nhé.\n\n"
+            f"🎉 Chào mừng <@{self.target_user_id}> đã gia nhập TNC! (Bot đã tự động đổi tên Discord giúp bạn).\n\n"
             f"🔹 Hãy đọc thật kỹ {c_rules} để nắm rõ các quy định và văn hóa hoạt động của guild.\n"
             f"🔹 Ghé qua {c_chat} để đàm đạo, chém gió và giao lưu cùng anh em.\n"
             f"🔹 Bất cứ khi nào có thắc mắc hay cần hỗ trợ gì về game, bro cứ hét thẳng vào {c_question} nhé, mọi người sẽ giải đáp nhiệt tình.\n\n"
@@ -240,7 +239,12 @@ class Onboarding(commands.Cog):
         view = OfficerApprovalView(self, thread.owner_id, api_data.get('Name'), yob)
         
         officer_mention = f"<@&{self.config.officer_role_id}>" if self.config.officer_role_id else "@Officer"
-        await thread.send(content=f"Đã kiểm tra xong thông tin! Mời {officer_mention} vào xem xét duyệt nhé.", embed=embed, view=view)
+        msg_text = (
+            f"✅ Đã kiểm tra xong thông tin! Mời {officer_mention} vào xem xét duyệt nhé.\n"
+            f"👉 **<@{thread.owner_id}>: Vui lòng nộp đơn (apply) vào guild `The Northern Constellations` trong game luôn nhé.** "
+            f"Officer sẽ duyệt ingame trước rồi mới duyệt đơn Discord và cấp Role cho bạn."
+        )
+        await thread.send(content=msg_text, embed=embed, view=view)
 
 
     @commands.Cog.listener()
