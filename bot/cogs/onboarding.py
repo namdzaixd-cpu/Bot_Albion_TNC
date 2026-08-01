@@ -110,14 +110,13 @@ class OfficerApprovalView(discord.ui.View):
         c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "Kênh Hỏi đáp"
         
         welcome_msg = (
-            f"-Id Discord: <@{self.target_user_id}>\n"
-            f"Hãy đọc thật kỹ {c_rules} (những quy định và vibe của guild) trước khi quyết định apply nhé.\n"
-            f"Nếu đã sẵn sàng, hãy đổi tên ở server Discord TNC theo form: \" [TNC] Ingame Tuổi \" (Bot đã tự đổi giúp bạn).\n"
-            f"Apply vào guild The Northern Constellations trong game và đợi một lát để được duyệt.\n"
-            f"Sau khi vào guild, ghé {c_chat} (Nơi trò chuyện của anh em trong guild) để giao lưu cùng mọi người nhé.\n"
-            f"Có thắc mắc gì về game thì vào {c_question} (Hỏi đáp, hỗ trợ và bàn luận về game) hỏi, anh em sẽ giải đáp cho.\n"
-            f"Khi vào guild hãy cư xử đúng mực, kính trên nhường dưới, không toxic không gây war nhaa.\n"
-            f"Chúc bạn một ngày vui vẻ ❤️"
+            f"🎉 Chào mừng <@{self.target_user_id}> đã gia nhập TNC! (Bot đã tự động đổi tên Discord giúp bạn).\n"
+            f"Vui lòng nộp đơn (apply) vào guild **The Northern Constellations** trong game và đợi một lát để Officer duyệt nhé.\n\n"
+            f"🔹 Hãy đọc thật kỹ {c_rules} để nắm rõ các quy định và văn hóa hoạt động của guild.\n"
+            f"🔹 Ghé qua {c_chat} để đàm đạo, chém gió và giao lưu cùng anh em.\n"
+            f"🔹 Bất cứ khi nào có thắc mắc hay cần hỗ trợ gì về game, bro cứ hét thẳng vào {c_question} nhé, mọi người sẽ giải đáp nhiệt tình.\n\n"
+            f"Khi vào guild hãy cư xử đúng mực, kính trên nhường dưới, không toxic và không gây war nha.\n"
+            f"Chúc bro chơi game vui vẻ ❤️"
         )
         await interaction.channel.send(welcome_msg)
 
