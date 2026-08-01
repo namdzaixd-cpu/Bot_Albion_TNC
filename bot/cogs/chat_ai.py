@@ -4,6 +4,8 @@ import aiohttp
 import collections
 import random
 import asyncio
+import base64
+import io
 try:
     from duckduckgo_search import DDGS
 except ImportError:
@@ -195,6 +197,41 @@ class ChatAI(commands.Cog):
                 save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
 
+    async def _image_to_base64(self, url: str) -> str:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        return base64.b64encode(data).decode('utf-8')
+        except Exception as e:
+            print(f"Lỗi tải ảnh: {e}")
+        return ""
+
+    async def _extract_text_from_image(self, b64_img: str, mime_type: str = "image/jpeg") -> str:
+        if not GEMINI_API_KEY:
+            return ""
+            
+        try:
+            # Luôn dùng gemini-2.5-flash hoặc gemini-1.5-flash để OCR vì model này hỗ trợ multimodal tốt nhất
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": "Trích xuất toàn bộ văn bản và mô tả ngắn gọn nội dung hình ảnh này (để làm dữ liệu tra cứu)."},
+                        {"inlineData": {"mimeType": mime_type, "data": b64_img}}
+                    ]
+                }]
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            print(f"Lỗi OCR ảnh: {e}")
+        return ""
+
     def _search_library(self, query: str, top_k: int = 2) -> list:
         if not self.library_data:
             return []
@@ -241,6 +278,24 @@ class ChatAI(commands.Cog):
             save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message(f"✅ Đã **THÊM** kênh <#{channel_id}> vào danh sách Thư viện. Dùng `/aimodel library_scan` để quét dữ liệu.", ephemeral=False)
 
+    async def _process_msg_for_docs(self, msg: discord.Message, title: str, docs: list):
+        content = msg.content or ""
+        for att in msg.attachments:
+            if att.content_type and att.content_type.startswith('image/'):
+                b64_img = await self._image_to_base64(att.url)
+                if b64_img:
+                    ocr_text = await self._extract_text_from_image(b64_img, att.content_type)
+                    if ocr_text:
+                        content += f"\n[Dữ liệu từ ảnh đính kèm: {ocr_text}]"
+                        
+        if content.strip():
+            docs.append({
+                "title": title,
+                "content": content.strip(),
+                "author": msg.author.display_name,
+                "url": msg.jump_url
+            })
+
     @aimodel_group.command(name="library_scan", description="Quét toàn bộ bài viết trong các kênh Thư viện để nạp vào não Bot")
     async def aimodel_library_scan(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
@@ -272,37 +327,19 @@ class ChatAI(commands.Cog):
                     for thread in channel.threads:
                         try:
                             async for msg in thread.history(limit=50, oldest_first=True):
-                                if msg.content:
-                                    docs.append({
-                                        "title": f"[{channel.name}] {thread.name}",
-                                        "content": msg.content,
-                                        "author": msg.author.display_name,
-                                        "url": msg.jump_url
-                                    })
+                                await self._process_msg_for_docs(msg, f"[{channel.name}] {thread.name}", docs)
                         except Exception:
                             pass
                     
                     async for thread in channel.archived_threads(limit=100):
                         try:
                             async for msg in thread.history(limit=50, oldest_first=True):
-                                if msg.content:
-                                    docs.append({
-                                        "title": f"[{channel.name}] {thread.name}",
-                                        "content": msg.content,
-                                        "author": msg.author.display_name,
-                                        "url": msg.jump_url
-                                    })
+                                await self._process_msg_for_docs(msg, f"[{channel.name}] {thread.name}", docs)
                         except Exception:
                             pass
                 else:
                     async for msg in channel.history(limit=1000, oldest_first=True):
-                        if msg.content:
-                            docs.append({
-                                "title": f"[{channel.name}] Tin nhắn từ {msg.author.display_name}",
-                                "content": msg.content,
-                                "author": msg.author.display_name,
-                                "url": msg.jump_url
-                            })
+                        await self._process_msg_for_docs(msg, f"[{channel.name}] Tin nhắn từ {msg.author.display_name}", docs)
             except Exception as e:
                 print(f"Lỗi khi quét kênh {lib_id}: {e}")
                 
@@ -649,6 +686,19 @@ class ChatAI(commands.Cog):
             
         with open("debug_prompt.txt", "w", encoding="utf-8") as f:
             f.write(prompt)
+            
+        gemini_parts = [{"text": prompt}]
+        or_content = [{"type": "text", "text": prompt}]
+        has_images = False
+        
+        if message.attachments:
+            for att in message.attachments:
+                if att.content_type and att.content_type.startswith('image/'):
+                    b64_img = await self._image_to_base64(att.url)
+                    if b64_img:
+                        has_images = True
+                        gemini_parts.append({"inlineData": {"mimeType": att.content_type, "data": b64_img}})
+                        or_content.append({"type": "image_url", "image_url": {"url": f"data:{att.content_type};base64,{b64_img}"}})
 
         # Bật typing indicator
         async with message.channel.typing():
@@ -665,7 +715,7 @@ class ChatAI(commands.Cog):
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={GEMINI_API_KEY}"
                     payload = {
                         "systemInstruction": {"parts": [{"text": self.system_instruction}]},
-                        "contents": [{"parts": [{"text": prompt}]}],
+                        "contents": [{"parts": gemini_parts}],
                     }
                     async with aiohttp.ClientSession() as session:
                         async with session.post(url, json=payload) as resp:
@@ -689,7 +739,7 @@ class ChatAI(commands.Cog):
                         "model": self.current_model,
                         "messages": [
                             {"role": "system", "content": self.system_instruction},
-                            {"role": "user", "content": prompt},
+                            {"role": "user", "content": or_content if has_images else prompt},
                         ],
                     }
                     headers = {"Authorization": f"Bearer {self.api_key}"}
