@@ -44,8 +44,8 @@ class OnboardConfig:
         return self.data.get("rules_channel_id")
         
     @property
-    def content_channel_id(self):
-        return self.data.get("content_channel_id")
+    def chat_channel_id(self):
+        return self.data.get("chat_channel_id")
         
     @property
     def question_channel_id(self):
@@ -105,17 +105,17 @@ class OfficerApprovalView(discord.ui.View):
         embed.set_footer(text=f"Duyệt bởi {interaction.user.display_name}")
         await interaction.message.edit(embed=embed, view=self)
         
-        c_rules = f"<#{self.cog.config.rules_channel_id}>" if self.cog.config.rules_channel_id else "《📋》𝐑𝐮𝐥𝐞𝐬"
-        c_content = f"<#{self.cog.config.content_channel_id}>" if self.cog.config.content_channel_id else "〔📰〕ᴄᴏɴᴛᴇɴᴛꜱ-ping🚩"
-        c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "🤔nghìn-lẻ-một-câu-hỏi-vì-sao🤔"
+        c_rules = f"<#{self.cog.config.rules_channel_id}>" if self.cog.config.rules_channel_id else "Kênh Rules"
+        c_chat = f"<#{self.cog.config.chat_channel_id}>" if self.cog.config.chat_channel_id else "Kênh Guild-chat"
+        c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "Kênh Hỏi đáp"
         
         welcome_msg = (
             f"-Id Discord: <@{self.target_user_id}>\n"
-            f"Hãy đọc thật kỹ {c_rules} trước khi quyết định apply nhé.\n"
+            f"Hãy đọc thật kỹ {c_rules} (những quy định và vibe của guild) trước khi quyết định apply nhé.\n"
             f"Nếu đã sẵn sàng, hãy đổi tên ở server Discord TNC theo form: \" [TNC] Ingame Tuổi \" (Bot đã tự đổi giúp bạn).\n"
             f"Apply vào guild The Northern Constellations trong game và đợi một lát để được duyệt.\n"
-            f"Sau khi vào guild, ghé {c_content} để tham gia content cùng mọi người nhé.\n"
-            f"Có thắc mắc gì về game thì vào {c_question} hỏi, anh em sẽ giải đáp cho.\n"
+            f"Sau khi vào guild, ghé {c_chat} (Nơi trò chuyện của anh em trong guild) để giao lưu cùng mọi người nhé.\n"
+            f"Có thắc mắc gì về game thì vào {c_question} (Hỏi đáp, hỗ trợ và bàn luận về game) hỏi, anh em sẽ giải đáp cho.\n"
             f"Khi vào guild hãy cư xử đúng mực, kính trên nhường dưới, không toxic không gây war nhaa.\n"
             f"Chúc bạn một ngày vui vẻ ❤️"
         )
@@ -290,7 +290,7 @@ class Onboarding(commands.Cog):
     async def onboard_setup_channels(self, interaction: discord.Interaction, 
                                      apply: discord.abc.GuildChannel,
                                      rules: discord.abc.GuildChannel,
-                                     content: discord.abc.GuildChannel,
+                                     guild_chat: discord.abc.GuildChannel,
                                      question: discord.abc.GuildChannel):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
@@ -298,7 +298,7 @@ class Onboarding(commands.Cog):
         
         self.config.data["apply_channel_id"] = str(apply.id)
         self.config.data["rules_channel_id"] = str(rules.id)
-        self.config.data["content_channel_id"] = str(content.id)
+        self.config.data["chat_channel_id"] = str(guild_chat.id)
         self.config.data["question_channel_id"] = str(question.id)
         self.config.save()
         await interaction.response.send_message("✅ Đã lưu cấu hình 4 kênh thành công!", ephemeral=True)
