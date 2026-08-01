@@ -1,6 +1,8 @@
 import os
 import re
 import aiohttp
+import collections
+import random
 from bs4 import BeautifulSoup
 import discord
 from discord import app_commands
@@ -16,6 +18,7 @@ class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api_key = OPENROUTER_API_KEY
+        self.message_buffers = collections.defaultdict(lambda: collections.deque(maxlen=30))
         self._reload_config()
         
     def _reload_config(self):
@@ -182,6 +185,12 @@ class ChatAI(commands.Cog):
         if message.author.bot:
             return
 
+        # Ghi nhớ tin nhắn vào bộ nhớ đệm của kênh
+        self.message_buffers[str(message.channel.id)].append({
+            "author": message.author.display_name,
+            "content": message.content
+        })
+
         print(f"📩 [DEBUG] Nhận tin nhắn: {message.content} từ {message.author}. Tag bot: {self.bot.user.mentioned_in(message)}")
 
         # Kiểm tra xem bot có được tag, hoặc tin nhắn có phải là reply cho bot không
@@ -199,7 +208,14 @@ class ChatAI(commands.Cog):
             if isinstance(replied_msg, discord.Message) and replied_msg.author == self.bot.user:
                 is_reply = True
 
-        if not (is_mentioned or is_reply):
+        # Logic từ khóa gọi ngầm
+        is_keyword_trigger = False
+        content_lower = message.content.lower()
+        trigger_keywords = ["thằng bot", "ê bot", "con bot", "hỏi bot", "bot đâu", "ndz bot"]
+        if any(kw in content_lower for kw in trigger_keywords):
+            is_keyword_trigger = True
+            
+        if not (is_mentioned or is_reply or is_keyword_trigger):
             return
 
         self._reload_config()
@@ -248,26 +264,30 @@ class ChatAI(commands.Cog):
                         
                     if hasattr(channel, 'history'):
                         context_data += f"--- Nội dung kênh #{getattr(channel, 'name', 'unknown')} ---\n"
-                        # Đọc lướt 100 tin nhắn gần nhất
-                        msg_count = 0
-                        empty_count = 0
-                        try:
-                            async for msg in channel.history(limit=100):
-                                msg_count += 1
-                                if not msg.content: 
-                                    empty_count += 1
-                                    continue
-                                context_data += f"[{msg.author.display_name}]: {msg.content}\n"
-                            
-                            if msg_count > 0 and msg_count == empty_count:
-                                context_data += f"[LỖI HỆ THỐNG: Đọc được {msg_count} tin nhắn nhưng TẤT CẢ đều có nội dung rỗng. Khả năng cao là bot chưa được bật 'Message Content Intent' trong Discord Developer Portal, hoặc tin nhắn chỉ chứa ảnh/sticker mà không có chữ.]\n"
-                            elif msg_count == 0:
-                                context_data += "[Kênh này hoàn toàn không có tin nhắn nào.]\n"
-                        except discord.errors.Forbidden:
-                            context_data += "[LỖI QUYỀN TRUY CẬP: Bot không có quyền 'Read Message History' hoặc 'View Channel' trong kênh này. Hãy bảo người dùng cấp quyền cho bot.]\n"
-                        except Exception as e:
-                            context_data += f"[LỖI KHÔNG XÁC ĐỊNH KHI ĐỌC KÊNH: {e}]\n"
-                            
+                        
+                        if channel_id_str in self.message_buffers and len(self.message_buffers[channel_id_str]) > 0:
+                            for msg_dict in self.message_buffers[channel_id_str]:
+                                context_data += f"[{msg_dict['author']}]: {msg_dict['content']}\n"
+                        else:
+                            msg_count = 0
+                            empty_count = 0
+                            try:
+                                async for msg in channel.history(limit=20):
+                                    msg_count += 1
+                                    if not msg.content: 
+                                        empty_count += 1
+                                        continue
+                                    context_data += f"[{msg.author.display_name}]: {msg.content}\n"
+                                
+                                if msg_count > 0 and msg_count == empty_count:
+                                    context_data += f"[LỖI HỆ THỐNG: Đọc được {msg_count} tin nhắn nhưng TẤT CẢ đều rỗng.]\n"
+                                elif msg_count == 0:
+                                    context_data += "[Kênh này hoàn toàn không có tin nhắn nào.]\n"
+                            except discord.errors.Forbidden:
+                                context_data += "[LỖI QUYỀN TRUY CẬP: Bot không có quyền 'Read Message History'.]\n"
+                            except Exception as e:
+                                context_data += f"[LỖI KHÔNG XÁC ĐỊNH KHI ĐỌC KÊNH: {e}]\n"
+                                
                         context_data += "--------------------------------------\n\n"
                     else:
                         context_data += f"--- Kênh này không hỗ trợ đọc tin nhắn ---\n\n"
