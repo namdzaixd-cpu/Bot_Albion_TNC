@@ -55,18 +55,26 @@ FEATURE_FIELDS = [
         "`/corelist` (xem danh sách core)",
     ),
     (
-        "🧠 AI Chat",
+        "🧠 Quản lý AI",
         "`/aimodel view` (xem model)\n"
         "`/aimodel set` (đổi model — Officer)\n"
         "`/aimodel add` (thêm model — Officer)\n"
         "`/aimodel remove` (xóa model — Officer)\n"
-        "`/aimodel buffer` (chỉnh bộ nhớ đệm — Officer)\n"
-        "`/aimodel intercept` (bật/tắt nói leo — Officer)\n"
-        "`/aimodel autowiki` (bật tắt tra Wiki tự động — Officer)\n"
-        "`/aimodel vision` (bật tắt đọc ảnh trong kênh chat — Officer)\n"
-        "`/aimodel library_set` (đặt kênh thư viện — Officer)\n"
-        "`/aimodel library_scan` (quét thư viện RAG — Officer)\n"
+        "`/aimodel balance` (xem số dư Credit)\n"
+        "`/aichat buffer` (chỉnh bộ nhớ đệm — Officer)\n"
+        "`/aichat intercept` (bật/tắt nói leo — Officer)\n"
+        "`/aichat vision` (bật/tắt đọc ảnh — Officer)\n"
+        "`/ailibrary set_channel` (đặt kênh thư viện — Officer)\n"
+        "`/ailibrary scan` (quét thư viện RAG — Officer)\n"
+        "`/ailibrary clear` (xóa thư viện RAG — Officer)\n"
+        "`/ailibrary autowiki` (bật/tắt tự tra Wiki — Officer)\n"
         "`/wiki` (tra cứu Wiki Albion thủ công)",
+    ),
+    (
+        "👋 Onboarding",
+        "`/onboard setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
+        "`/onboard set_apply_channel` (chọn kênh apply — Officer)\n"
+        "`/onboard toggle` (bật/tắt tính năng Onboarding — Officer)",
     ),
 ]
 
