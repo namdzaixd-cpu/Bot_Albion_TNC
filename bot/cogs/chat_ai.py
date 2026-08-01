@@ -42,6 +42,9 @@ class ChatAI(commands.Cog):
         if "autowiki_channels" not in self.ai_config:
             self.ai_config["autowiki_channels"] = []
             
+        self.library_file = os.path.join(DATA_DIR, "tnc_library_v1.json")
+        self.library_data = load_json(self.library_file, list)
+        
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
         self.available_models = self.ai_config.get("available_models", [
             "google/gemini-3.5-flash-lite",
@@ -191,6 +194,111 @@ class ChatAI(commands.Cog):
                 self.ai_config["intercept_channels"] = intercepts
                 save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
+
+    def _search_library(self, query: str, top_k: int = 2) -> list:
+        if not self.library_data:
+            return []
+            
+        import re
+        query_words = set(re.findall(r'\w+', query.lower()))
+        if not query_words:
+            return []
+            
+        scored = []
+        for doc in self.library_data:
+            text = (doc.get("title", "") + " " + doc.get("content", "")).lower()
+            doc_words = set(re.findall(r'\w+', text))
+            
+            overlap = len(query_words.intersection(doc_words))
+            if overlap > 0:
+                scored.append((overlap, doc))
+                
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [doc for score, doc in scored[:top_k]]
+
+    @aimodel_group.command(name="library_set", description="Đặt kênh này làm Thư viện Nội bộ cho Bot học hỏi")
+    async def aimodel_library_set(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
+            return
+            
+        self.ai_config["library_channel_id"] = str(interaction.channel_id)
+        save_json(self.ai_config, self.ai_config_file)
+        await interaction.response.send_message(f"✅ Đã đặt kênh <#{interaction.channel_id}> làm Thư viện Nội bộ. Dùng `/aimodel library_scan` để bắt đầu học.", ephemeral=False)
+
+    @aimodel_group.command(name="library_scan", description="Quét toàn bộ bài viết trong kênh Thư viện để nạp vào não Bot")
+    async def aimodel_library_scan(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
+            return
+            
+        library_id = self.ai_config.get("library_channel_id")
+        if not library_id:
+            await interaction.response.send_message("⚠️ Chưa cài đặt kênh Thư viện. Dùng `/aimodel library_set` ở kênh cần cài trước.", ephemeral=True)
+            return
+            
+        channel = self.bot.get_channel(int(library_id))
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(int(library_id))
+            except Exception:
+                await interaction.response.send_message("❌ Không tìm thấy kênh Thư viện. Vui lòng set lại.", ephemeral=True)
+                return
+                
+        await interaction.response.defer(ephemeral=False)
+        docs = []
+        try:
+            if isinstance(channel, discord.ForumChannel):
+                for thread in channel.threads:
+                    try:
+                        async for msg in thread.history(limit=50, oldest_first=True):
+                            if msg.content:
+                                docs.append({
+                                    "title": thread.name,
+                                    "content": msg.content,
+                                    "author": msg.author.display_name,
+                                    "url": msg.jump_url
+                                })
+                    except Exception as e:
+                        print(f"Error scanning thread {thread.name}: {e}")
+                
+                async for thread in channel.archived_threads(limit=100):
+                    try:
+                        async for msg in thread.history(limit=50, oldest_first=True):
+                            if msg.content:
+                                docs.append({
+                                    "title": thread.name,
+                                    "content": msg.content,
+                                    "author": msg.author.display_name,
+                                    "url": msg.jump_url
+                                })
+                    except Exception:
+                        pass
+            else:
+                async for msg in channel.history(limit=1000, oldest_first=True):
+                    if msg.content:
+                        docs.append({
+                            "title": f"Tin nhắn từ {msg.author.display_name}",
+                            "content": msg.content,
+                            "author": msg.author.display_name,
+                            "url": msg.jump_url
+                        })
+                        
+            self.library_data = docs
+            save_json(self.library_data, self.library_file)
+            await interaction.followup.send(f"✅ Quét hoàn tất! Đã lưu **{len(docs)}** đoạn dữ liệu vào sổ tay của bot.")
+        except Exception as e:
+            await interaction.followup.send(f"❌ Có lỗi xảy ra khi quét: {e}")
+
+    @aimodel_group.command(name="library_clear", description="Xóa trắng dữ liệu Thư viện Nội bộ")
+    async def aimodel_library_clear(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
+            return
+            
+        self.library_data = []
+        save_json(self.library_data, self.library_file)
+        await interaction.response.send_message("✅ Đã xóa toàn bộ kiến thức trong Thư viện Nội bộ.", ephemeral=False)
 
     async def _search_wiki_async(self, query: str) -> str:
         if DDGS is None:
@@ -393,6 +501,16 @@ class ChatAI(commands.Cog):
                 wiki_data = await self._search_wiki_async(content)
                 wiki_context = f"--- Dữ liệu tra cứu tự động từ Albion Wiki ---\n{wiki_data}\n--------------------------------------\n\n"
         
+        # Thư viện nội bộ RAG
+        library_context = ""
+        if self.library_data:
+            top_docs = self._search_library(content)
+            if top_docs:
+                library_context = "--- TÀI LIỆU NỘI BỘ CỦA GUILD TNC (ƯU TIÊN DÙNG ĐỂ TRẢ LỜI) ---\n"
+                for i, doc in enumerate(top_docs):
+                    library_context += f"Tài liệu {i+1}: Tiêu đề '{doc.get('title')}' bởi {doc.get('author')}. Nội dung: {doc.get('content')}\n"
+                library_context += "--------------------------------------\n\n"
+        
         all_channel_ids = list(set(channel_mentions + link_mentions))
         
         # Luôn thêm kênh hiện tại vào để bot hiểu ngữ cảnh trò chuyện đang diễn ra
@@ -501,8 +619,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context or web_context or wiki_context:
-            prompt = guild_info + context_data + reply_context + web_context + wiki_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context or wiki_context or library_context:
+            prompt = guild_info + context_data + reply_context + library_context + web_context + wiki_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             
