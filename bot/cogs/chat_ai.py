@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL
+from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
@@ -33,7 +33,7 @@ class ChatAI(commands.Cog):
         return self.message_buffers[channel_id_str]
         
     def _reload_config(self):
-        self.ai_config_file = os.path.join(DATA_DIR, "tnc_ai_config.json")
+        self.ai_config_file = os.path.join(STORAGE_DIR, "tnc_ai_config.json")
         self.ai_config = load_json(self.ai_config_file, dict)
         if "channel_buffers" not in self.ai_config:
             self.ai_config["channel_buffers"] = {}
