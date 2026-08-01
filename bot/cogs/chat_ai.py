@@ -473,6 +473,7 @@ class ChatAI(commands.Cog):
             "- KHÔNG ĐƯỢC PHÉP tự động chèn chữ ngoại ngữ vào câu nói trừ khi người dùng CỐ TÌNH yêu cầu.\n\n"
             "QUAN TRỌNG: Khi người dùng hỏi về nội dung kênh chat hoặc dữ liệu, hệ thống sẽ gửi lịch sử tin nhắn. "
             "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Dùng dữ liệu đó để trả lời."
+        )
 
     async def _fetch_url_content(self, url: str) -> str:
         try:
