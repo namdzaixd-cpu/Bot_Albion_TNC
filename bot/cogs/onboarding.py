@@ -136,6 +136,38 @@ class OfficerApprovalView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
 
 
+class ApplicantConfirmView(discord.ui.View):
+    def __init__(self, cog: 'Onboarding', target_user_id: int, ign_name: str, yob: str, embed: discord.Embed):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.target_user_id = target_user_id
+        self.ign_name = ign_name
+        self.yob = yob
+        self.embed = embed
+
+    @discord.ui.button(label="Đã gửi apply ingame", style=discord.ButtonStyle.green, custom_id="onboard_applicant_done")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user_id:
+            await interaction.response.send_message("❌ Nút này chỉ dành cho người nộp đơn!", ephemeral=True)
+            return
+            
+        await interaction.response.defer()
+        
+        officer_mention = f"<@&{self.cog.config.officer_role_id}>" if self.cog.config.officer_role_id else "@Officer"
+        msg_text = f"✅ Lính mới đã xác nhận nộp đơn ingame. Mời {officer_mention} vào xem xét duyệt nhé!"
+        
+        view = OfficerApprovalView(self.cog, self.target_user_id, self.ign_name, self.yob)
+        await interaction.message.edit(content=msg_text, embed=self.embed, view=view)
+
+    @discord.ui.button(label="Chưa gửi apply ingame", style=discord.ButtonStyle.secondary, custom_id="onboard_applicant_not_done")
+    async def not_done(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user_id:
+            await interaction.response.send_message("❌ Nút này chỉ dành cho người nộp đơn!", ephemeral=True)
+            return
+            
+        await interaction.response.send_message("⚠️ Bạn vui lòng vào game, tìm guild **The Northern Constellations** và nộp đơn apply. Sau khi apply xong thì quay lại đây bấm nút **Đã gửi apply ingame** nhé!", ephemeral=True)
+
+
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -236,13 +268,11 @@ class Onboarding(commands.Cog):
         old_guild = api_data.get('GuildName', 'Không có')
         embed.add_field(name="Guild Hiện Tại / Cũ", value=old_guild, inline=False)
         
-        view = OfficerApprovalView(self, thread.owner_id, api_data.get('Name'), yob)
+        view = ApplicantConfirmView(self, thread.owner_id, api_data.get('Name'), yob, embed)
         
-        officer_mention = f"<@&{self.config.officer_role_id}>" if self.config.officer_role_id else "@Officer"
         msg_text = (
-            f"✅ Đã kiểm tra xong thông tin! Mời {officer_mention} vào xem xét duyệt nhé.\n"
-            f"👉 **<@{thread.owner_id}>: Vui lòng nộp đơn (apply) vào guild `The Northern Constellations` trong game luôn nhé.** "
-            f"Officer sẽ duyệt ingame trước rồi mới duyệt đơn Discord và cấp Role cho bạn."
+            f"👉 **<@{thread.owner_id}>: Vui lòng nộp đơn (apply) vào guild `The Northern Constellations` trong game.**\n"
+            f"Sau khi nộp xong ingame, hãy bấm nút **Đã gửi apply ingame** bên dưới để gọi Officer vào duyệt nhé!"
         )
         await thread.send(content=msg_text, embed=embed, view=view)
 
