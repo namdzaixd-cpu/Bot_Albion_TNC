@@ -5,13 +5,13 @@ from datetime import datetime
 import discord
 from discord.ext import commands
 
-from core.config import DATA_DIR
+from core.config import STORAGE_DIR
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG FILTER THÀNH VIÊN (LastSeen)
 # ==============================================================================
-LASTSEEN_FILE = os.path.join(DATA_DIR, "tnc_lastseen_v1.json")
+LASTSEEN_FILE = os.path.join(STORAGE_DIR, "tnc_lastseen_v1.json")
 
 
 class LastSeenCog(commands.Cog):

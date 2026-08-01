@@ -4,15 +4,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR
+from core.config import STORAGE_DIR
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG MASSING
 # ==============================================================================
-MASSING_FILE = os.path.join(DATA_DIR, "tnc_massing_v1.json")
-TEMPLATES_FILE = os.path.join(DATA_DIR, "tnc_templates_v1.json")
+MASSING_FILE = os.path.join(STORAGE_DIR, "tnc_massing_v1.json")
+TEMPLATES_FILE = os.path.join(STORAGE_DIR, "tnc_templates_v1.json")
 
 active_parties = {}
 role_icons = {"Tank": "🛡️", "Heal": "💚", "SP": "💜", "DPS": "⚔️", "Caller": "👑"}
@@ -543,6 +543,7 @@ class MassingModal(discord.ui.Modal, title="⚔️ Tạo Massing"):
         active_parties[str(msg.id)] = active_parties.pop(party_id)
         active_parties[str(msg.id)]["id"] = str(msg.id)
         view.party_id = str(msg.id)
+        view.rebuild_buttons()  # FIX: đồng bộ custom_id nút bấm với msg.id mới
         save_massing()
         await msg.edit(embed=build_party_embed(active_parties[str(msg.id)]), view=view)
 

@@ -6,16 +6,16 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR
+from core.config import STORAGE_DIR
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG REGISTER + GUILDCHECK (Đăng ký IGN & tự xóa role nếu rời guild)
 # ==============================================================================
-REGISTER_FILE = os.path.join(DATA_DIR, "tnc_register_v1.json")
-GUILDCHECK_CONFIG_FILE = os.path.join(DATA_DIR, "tnc_guildcheck_v1.json")
-UNRESOLVED_FILE = os.path.join(DATA_DIR, "tnc_unresolved_v1.json")
+REGISTER_FILE = os.path.join(STORAGE_DIR, "tnc_register_v1.json")
+GUILDCHECK_CONFIG_FILE = os.path.join(STORAGE_DIR, "tnc_guildcheck_v1.json")
+UNRESOLVED_FILE = os.path.join(STORAGE_DIR, "tnc_unresolved_v1.json")
 REGION_API_BASE = {
     "Americas": "https://gameinfo.albiononline.com/api/gameinfo",
     "Asia": "https://gameinfo-sgp.albiononline.com/api/gameinfo",

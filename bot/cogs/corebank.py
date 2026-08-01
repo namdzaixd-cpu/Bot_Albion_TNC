@@ -7,15 +7,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR
+from core.config import STORAGE_DIR
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG CORE-BANK (Tích hợp UnbelievaBoat)
 # ==============================================================================
-CORECONFIG_FILE = os.path.join(DATA_DIR, "tnc_coreconfig_v1.json")
-CORE_CREDITED_FILE = os.path.join(DATA_DIR, "tnc_core_credited_v1.json")
+CORECONFIG_FILE = os.path.join(STORAGE_DIR, "tnc_coreconfig_v1.json")
+CORE_CREDITED_FILE = os.path.join(STORAGE_DIR, "tnc_core_credited_v1.json")
 
 
 def load_coreconfig():

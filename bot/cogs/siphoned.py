@@ -7,14 +7,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR
+from core.config import STORAGE_DIR
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG PHÂN TÍCH ĐIỂM SIPHONED (LOG ANALYZER)
 # ==============================================================================
-SIPHONED_FILE = os.path.join(DATA_DIR, "tnc_sp_v32.json")
+SIPHONED_FILE = os.path.join(STORAGE_DIR, "tnc_sp_v32.json")
 
 
 def load_sp():
