@@ -49,6 +49,25 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
 - Cấu hình AI Chat: Chỉ dẫn tính cách, prompt hệ thống nằm tại file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt). Chỉnh sửa file này thay vì sửa trực tiếp code Python trong cog.
 
+## Thư mục Storage — QUY TẮC BẮT BUỘC
+
+`bot/Storage/` là nơi lưu trữ **dữ liệu vận hành thật** của bot (dữ liệu người dùng, cấu hình guild, template, điểm số...).
+Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có thay đổi (xem `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`).
+
+### ⛔ TUYỆT ĐỐI KHÔNG được phép:
+- Xóa, ghi đè, hay sửa thẳng file JSON trong `bot/Storage/` — dù chỉ để test hay debug.
+- Đọc/ghi file trong thư mục này bằng `open()` thuần — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
+- Đặt file tạm, file test, file log vào đây — các file không phải dữ liệu kho sẽ làm ô nhiễm GitHub sync.
+
+### ✅ Quy tắc khi thêm dữ liệu mới:
+1. File JSON mới **phải** đặt vào `bot/Storage/`.
+2. Import `STORAGE_DIR` từ `bot/core/config.py`, khai báo đường dẫn bằng `os.path.join(STORAGE_DIR, "tên_file.json")`.
+3. Đặt tên file theo pattern: `tnc_<tính_năng>_v<số_version>.json`
+   - Ví dụ đúng: `tnc_massing_v1.json`, `tnc_register_v1.json`, `tnc_sp_v32.json`
+   - Ví dụ sai: `data.json`, `config_temp.json`, `test123.json`
+4. Thêm đường dẫn mới vào danh sách `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`.
+5. Đọc file chi tiết [bot/Storage/README.md](bot/Storage/README.md) trước khi thêm file mới.
+
 ## Skills & Agents có sẵn trong dự án
 
 `.claude/skills/` — 16 skill từ [anthropics/skills](https://github.com/anthropics/skills) (chi tiết:
