@@ -189,9 +189,33 @@ class ChatAI(commands.Cog):
                             if pct > 90:
                                 msg += "⚠️ **BÁO ĐỘNG:** Sắp hết hạn mức Credit! Chuẩn bị sập nguồn!\n"
                         else:
+                            remaining = 9999.0 # Không giới hạn
                             msg += f"- 💳 **Giới hạn:** Không giới hạn (hoặc nạp pay-as-you-go)\n"
                             
                         msg += f"- 🆓 **Gói Free Tier:** {'Có' if is_free else 'Không'}\n"
+                        
+                        # Ước tính số request còn lại
+                        try:
+                            async with session.get("https://openrouter.ai/api/v1/models", timeout=10) as model_resp:
+                                if model_resp.status == 200:
+                                    models_data = await model_resp.json()
+                                    cur_model = next((m for m in models_data.get("data", []) if m["id"] == self.current_model), None)
+                                    if cur_model:
+                                        pricing = cur_model.get("pricing", {})
+                                        p_prompt = float(pricing.get("prompt", 0))
+                                        p_comp = float(pricing.get("completion", 0))
+                                        
+                                        if p_prompt == 0 and p_comp == 0:
+                                            msg += f"\n🔮 **ƯỚC TÍNH SỨC CHỊU ĐỰNG CỦA BOT:**\n- 🤖 Model hiện tại (`{self.current_model}`) đang là **Miễn phí (Free)**.\n- 🚀 Số request còn lại: **Vô hạn** (theo Credit).\n"
+                                        elif remaining < 9000:
+                                            # Giả định 1500 prompt token, 300 completion token mỗi request
+                                            avg_cost = (1500 * p_prompt) + (300 * p_comp)
+                                            if avg_cost > 0:
+                                                est_reqs = int(remaining / avg_cost)
+                                                msg += f"\n🔮 **ƯỚC TÍNH SỨC CHỊU ĐỰNG CỦA BOT:**\n- 🤖 Model: `{self.current_model}`\n- 💵 Phí trung bình: `${avg_cost:.5f}` / câu hỏi (tạm tính ~1800 tokens).\n- 🚀 Có thể trụ được khoảng: **~{est_reqs:,} câu hỏi nữa**.\n"
+                        except Exception as e:
+                            print(f"Lỗi ước tính request: {e}")
+
                         
                         if requests == "Không giới hạn":
                             msg += f"- 🚦 **Rate Limit:** {requests}\n"
