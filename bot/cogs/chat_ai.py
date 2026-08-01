@@ -170,7 +170,11 @@ class ChatAI(commands.Cog):
                         is_free = info.get("is_free_tier", False)
                         
                         rate_limit = info.get("rate_limit", {})
-                        requests = rate_limit.get("requests", "Không giới hạn")
+                        req_val = rate_limit.get("requests", "Không giới hạn")
+                        if isinstance(req_val, int) and req_val < 0:
+                            requests = "Không giới hạn"
+                        else:
+                            requests = str(req_val)
                         interval = rate_limit.get("interval", "N/A")
                         
                         msg = f"🔋 **TÌNH TRẠNG NĂNG LƯỢNG (CREDITS) CỦA BOT:**\n"
@@ -186,7 +190,11 @@ class ChatAI(commands.Cog):
                             msg += f"- 💳 **Giới hạn:** Không giới hạn (hoặc nạp pay-as-you-go)\n"
                             
                         msg += f"- 🆓 **Gói Free Tier:** {'Có' if is_free else 'Không'}\n"
-                        msg += f"- 🚦 **Rate Limit:** Tối đa `{requests}` request mỗi `{interval}`\n"
+                        
+                        if requests == "Không giới hạn":
+                            msg += f"- 🚦 **Rate Limit:** {requests}\n"
+                        else:
+                            msg += f"- 🚦 **Rate Limit:** Tối đa `{requests}` request mỗi `{interval}`\n"
                         
                         await interaction.followup.send(msg)
                     else:
