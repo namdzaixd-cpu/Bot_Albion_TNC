@@ -19,6 +19,7 @@ EXTENSIONS = [
     "cogs.alo_tts",
     "cogs.corebank",
     "cogs.chat_ai",
+    "cogs.onboarding",
 ]
 
 
