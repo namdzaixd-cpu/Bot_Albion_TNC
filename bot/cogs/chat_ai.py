@@ -216,79 +216,99 @@ class ChatAI(commands.Cog):
         scored.sort(key=lambda x: x[0], reverse=True)
         return [doc for score, doc in scored[:top_k]]
 
-    @aimodel_group.command(name="library_set", description="Đặt kênh này làm Thư viện Nội bộ cho Bot học hỏi")
+    @aimodel_group.command(name="library_set", description="Bật/Tắt kênh này làm Thư viện Nội bộ cho Bot học hỏi")
     async def aimodel_library_set(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
             return
             
-        self.ai_config["library_channel_id"] = str(interaction.channel_id)
-        save_json(self.ai_config, self.ai_config_file)
-        await interaction.response.send_message(f"✅ Đã đặt kênh <#{interaction.channel_id}> làm Thư viện Nội bộ. Dùng `/aimodel library_scan` để bắt đầu học.", ephemeral=False)
+        channel_id = str(interaction.channel_id)
+        library_ids = self.ai_config.get("library_channel_ids", [])
+        
+        # Hỗ trợ backward compatibility
+        old_id = self.ai_config.get("library_channel_id")
+        if old_id and old_id not in library_ids:
+            library_ids.append(old_id)
+        
+        if channel_id in library_ids:
+            library_ids.remove(channel_id)
+            self.ai_config["library_channel_ids"] = library_ids
+            save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message(f"✅ Đã **BỎ** kênh <#{channel_id}> khỏi danh sách Thư viện.", ephemeral=False)
+        else:
+            library_ids.append(channel_id)
+            self.ai_config["library_channel_ids"] = library_ids
+            save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message(f"✅ Đã **THÊM** kênh <#{channel_id}> vào danh sách Thư viện. Dùng `/aimodel library_scan` để quét dữ liệu.", ephemeral=False)
 
-    @aimodel_group.command(name="library_scan", description="Quét toàn bộ bài viết trong kênh Thư viện để nạp vào não Bot")
+    @aimodel_group.command(name="library_scan", description="Quét toàn bộ bài viết trong các kênh Thư viện để nạp vào não Bot")
     async def aimodel_library_scan(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
             return
             
-        library_id = self.ai_config.get("library_channel_id")
-        if not library_id:
-            await interaction.response.send_message("⚠️ Chưa cài đặt kênh Thư viện. Dùng `/aimodel library_set` ở kênh cần cài trước.", ephemeral=True)
+        library_ids = self.ai_config.get("library_channel_ids", [])
+        old_id = self.ai_config.get("library_channel_id")
+        if old_id and old_id not in library_ids:
+            library_ids.append(old_id)
+            
+        if not library_ids:
+            await interaction.response.send_message("⚠️ Chưa cài đặt kênh Thư viện nào. Dùng `/aimodel library_set` ở kênh cần cài trước.", ephemeral=True)
             return
             
-        channel = self.bot.get_channel(int(library_id))
-        if channel is None:
-            try:
-                channel = await self.bot.fetch_channel(int(library_id))
-            except Exception:
-                await interaction.response.send_message("❌ Không tìm thấy kênh Thư viện. Vui lòng set lại.", ephemeral=True)
-                return
-                
         await interaction.response.defer(ephemeral=False)
         docs = []
-        try:
-            if isinstance(channel, discord.ForumChannel):
-                for thread in channel.threads:
-                    try:
-                        async for msg in thread.history(limit=50, oldest_first=True):
-                            if msg.content:
-                                docs.append({
-                                    "title": thread.name,
-                                    "content": msg.content,
-                                    "author": msg.author.display_name,
-                                    "url": msg.jump_url
-                                })
-                    except Exception as e:
-                        print(f"Error scanning thread {thread.name}: {e}")
+        
+        for lib_id in library_ids:
+            channel = self.bot.get_channel(int(lib_id))
+            if channel is None:
+                try:
+                    channel = await self.bot.fetch_channel(int(lib_id))
+                except Exception:
+                    continue
+                    
+            try:
+                if isinstance(channel, discord.ForumChannel):
+                    for thread in channel.threads:
+                        try:
+                            async for msg in thread.history(limit=50, oldest_first=True):
+                                if msg.content:
+                                    docs.append({
+                                        "title": f"[{channel.name}] {thread.name}",
+                                        "content": msg.content,
+                                        "author": msg.author.display_name,
+                                        "url": msg.jump_url
+                                    })
+                        except Exception:
+                            pass
+                    
+                    async for thread in channel.archived_threads(limit=100):
+                        try:
+                            async for msg in thread.history(limit=50, oldest_first=True):
+                                if msg.content:
+                                    docs.append({
+                                        "title": f"[{channel.name}] {thread.name}",
+                                        "content": msg.content,
+                                        "author": msg.author.display_name,
+                                        "url": msg.jump_url
+                                    })
+                        except Exception:
+                            pass
+                else:
+                    async for msg in channel.history(limit=1000, oldest_first=True):
+                        if msg.content:
+                            docs.append({
+                                "title": f"[{channel.name}] Tin nhắn từ {msg.author.display_name}",
+                                "content": msg.content,
+                                "author": msg.author.display_name,
+                                "url": msg.jump_url
+                            })
+            except Exception as e:
+                print(f"Lỗi khi quét kênh {lib_id}: {e}")
                 
-                async for thread in channel.archived_threads(limit=100):
-                    try:
-                        async for msg in thread.history(limit=50, oldest_first=True):
-                            if msg.content:
-                                docs.append({
-                                    "title": thread.name,
-                                    "content": msg.content,
-                                    "author": msg.author.display_name,
-                                    "url": msg.jump_url
-                                })
-                    except Exception:
-                        pass
-            else:
-                async for msg in channel.history(limit=1000, oldest_first=True):
-                    if msg.content:
-                        docs.append({
-                            "title": f"Tin nhắn từ {msg.author.display_name}",
-                            "content": msg.content,
-                            "author": msg.author.display_name,
-                            "url": msg.jump_url
-                        })
-                        
-            self.library_data = docs
-            save_json(self.library_data, self.library_file)
-            await interaction.followup.send(f"✅ Quét hoàn tất! Đã lưu **{len(docs)}** đoạn dữ liệu vào sổ tay của bot.")
-        except Exception as e:
-            await interaction.followup.send(f"❌ Có lỗi xảy ra khi quét: {e}")
+        self.library_data = docs
+        save_json(self.library_data, self.library_file)
+        await interaction.followup.send(f"✅ Quét hoàn tất **{len(library_ids)}** kênh! Đã lưu tổng cộng **{len(docs)}** đoạn dữ liệu vào sổ tay của bot.")
 
     @aimodel_group.command(name="library_clear", description="Xóa trắng dữ liệu Thư viện Nội bộ")
     async def aimodel_library_clear(self, interaction: discord.Interaction):
