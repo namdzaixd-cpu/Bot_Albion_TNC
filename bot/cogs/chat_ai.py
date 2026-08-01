@@ -426,7 +426,7 @@ class ChatAI(commands.Cog):
             
         channel_id = str(interaction.channel_id)
         vision_channels = self.ai_config.get("vision_channels", [])
-        
+
         if state == "on":
             if channel_id not in vision_channels:
                 vision_channels.append(channel_id)
