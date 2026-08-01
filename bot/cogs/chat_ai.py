@@ -54,7 +54,7 @@ class ChatAI(commands.Cog):
             "openai/gpt-4o-mini"
         ])
         
-        if self.api_key:
+        if OPENROUTER_API_KEY or GEMINI_API_KEY:
             instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
             if os.path.exists(instruction_path):
                 try:
@@ -66,7 +66,7 @@ class ChatAI(commands.Cog):
             else:
                 self.system_instruction = self._get_default_instruction()
         else:
-            print("⚠️ WARNING: OPENROUTER_API_KEY chưa được cấu hình. Tính năng AI sẽ không hoạt động.")
+            print("⚠️ WARNING: Chưa cấu hình OPENROUTER_API_KEY lẫn GEMINI_API_KEY. Tính năng AI sẽ không hoạt động.")
             self.system_instruction = None
 
     aimodel_group = app_commands.Group(name="aimodel", description="Quản lý Model AI")
@@ -572,7 +572,7 @@ class ChatAI(commands.Cog):
         if not (is_mentioned or is_reply or is_keyword_trigger or is_random_intercept):
             return
 
-        if not self.api_key:
+        if not (OPENROUTER_API_KEY or GEMINI_API_KEY):
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
             return
 
@@ -637,9 +637,12 @@ class ChatAI(commands.Cog):
                     if hasattr(channel, 'history'):
                         context_data += f"--- Nội dung kênh #{getattr(channel, 'name', 'unknown')} ---\n"
                         
-                        buffer = self.get_buffer(channel_id_str)
-                        if len(buffer) > 0:
-                            for msg_dict in buffer:
+                        buffer_items = list(self.get_buffer(channel_id_str))
+                        if channel_id_str == str(message.channel.id) and buffer_items:
+                            # Tin nhắn hiện tại đã được gộp riêng vào cuối prompt, bỏ để tránh lặp
+                            buffer_items = buffer_items[:-1]
+                        if buffer_items:
+                            for msg_dict in buffer_items:
                                 context_data += f"[{msg_dict['author']} ({msg_dict.get('roles', 'Member')})]: {msg_dict['content']}\n"
                         else:
                             msg_count = 0

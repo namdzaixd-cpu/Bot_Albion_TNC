@@ -59,6 +59,7 @@ bot/test_gemini_aistudio.py
 # File backup và tạm thời do bot tạo ra khi lưu dữ liệu
 bot/*.bak
 bot/*.tmp
+debug_prompt.txt
 
 # Python bytecode cache
 __pycache__/
