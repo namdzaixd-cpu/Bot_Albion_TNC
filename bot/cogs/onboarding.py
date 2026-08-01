@@ -60,7 +60,7 @@ class OfficerApprovalView(discord.ui.View):
         self.ign_name = ign_name
         self.yob = yob
 
-    @discord.ui.button(label="Duyệt Lính", style=discord.ButtonStyle.green, custom_id="onboard_approve")
+    @discord.ui.button(label="Duyệt Đơn", style=discord.ButtonStyle.green, custom_id="onboard_approve")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Officer trở lên mới được duyệt!", ephemeral=True)
@@ -154,7 +154,7 @@ class ApplicantConfirmView(discord.ui.View):
         await interaction.response.defer()
         
         officer_mention = f"<@&{self.cog.config.officer_role_id}>" if self.cog.config.officer_role_id else "@Officer"
-        msg_text = f"✅ Lính mới đã xác nhận nộp đơn ingame. Mời {officer_mention} vào xem xét duyệt nhé!"
+        msg_text = f"✅ Thành viên mới đã xác nhận nộp đơn ingame. Mời {officer_mention} vào xem xét duyệt nhé!"
         
         view = OfficerApprovalView(self.cog, self.target_user_id, self.ign_name, self.yob)
         await interaction.message.edit(content=msg_text, embed=self.embed, view=view)
@@ -317,7 +317,7 @@ class Onboarding(commands.Cog):
             return
         self.config.is_enabled = not self.config.is_enabled
         status = "BẬT" if self.config.is_enabled else "TẮT"
-        await interaction.response.send_message(f"✅ Đã **{status}** tính năng tự động check đơn lính mới.", ephemeral=True)
+        await interaction.response.send_message(f"✅ Đã **{status}** tính năng tự động check đơn thành viên mới.", ephemeral=True)
 
     @onboard_group.command(name="setup_channels", description="Cài đặt các kênh cần thiết để bot tag trong lời chào")
     async def onboard_setup_channels(self, interaction: discord.Interaction, 
