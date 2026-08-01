@@ -319,6 +319,16 @@ class Onboarding(commands.Cog):
         status = "BẬT" if self.config.is_enabled else "TẮT"
         await interaction.response.send_message(f"✅ Đã **{status}** tính năng tự động check đơn thành viên mới.", ephemeral=True)
 
+    @onboard_group.command(name="set_apply_channel", description="Chỉ định kênh Forum dùng để nộp đơn")
+    async def onboard_set_apply_channel(self, interaction: discord.Interaction, apply: discord.abc.GuildChannel):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
+            return
+        
+        self.config.data["apply_channel_id"] = str(apply.id)
+        self.config.save()
+        await interaction.response.send_message(f"✅ Đã chỉ định kênh Apply thành công: <#{apply.id}>", ephemeral=True)
+
     @onboard_group.command(name="setup_channels", description="Cài đặt các kênh cần thiết để bot tag trong lời chào")
     async def onboard_setup_channels(self, interaction: discord.Interaction, 
                                      apply: discord.abc.GuildChannel,
