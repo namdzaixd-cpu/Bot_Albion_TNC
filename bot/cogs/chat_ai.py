@@ -717,6 +717,14 @@ class ChatAI(commands.Cog):
             
             if role_counts:
                 guild_info += f"Thống kê số lượng thành viên của từng Role: {', '.join(role_counts)}\n"
+
+            channels_list = []
+            for ch in message.guild.text_channels:
+                channels_list.append(f"<#{ch.id}> (tên: {ch.name})")
+            if channels_list:
+                guild_info += f"Danh sách các kênh chat: {', '.join(channels_list)}\n"
+                guild_info += "GHI CHÚ QUAN TRỌNG: Để nhắc đến/tag một kênh chat, BẠN BẮT BUỘC PHẢI VIẾT ĐÚNG MÃ CỦA NÓ, ví dụ: <#123456789> chứ không được viết là #tên-kênh.\n"
+
             guild_info += "--------------------------------------\n\n"
 
         # Thông tin người gửi và roles
