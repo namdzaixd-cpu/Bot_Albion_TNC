@@ -70,6 +70,8 @@ class ChatAI(commands.Cog):
             self.system_instruction = None
 
     aimodel_group = app_commands.Group(name="aimodel", description="Quản lý Model AI")
+    aichat_group = app_commands.Group(name="aichat", description="Quản lý Hành vi Chat của Bot")
+    ailibrary_group = app_commands.Group(name="ailibrary", description="Quản lý Thư viện Kiến thức")
 
     async def autocomplete_model(self, interaction: discord.Interaction, current: str):
         self._reload_config()
@@ -202,7 +204,7 @@ class ChatAI(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Có lỗi xảy ra khi kiểm tra số dư: {e}")
 
-    @aimodel_group.command(name="buffer", description="Chỉnh số tin nhắn bot lưu đệm ở kênh hiện tại")
+    @aichat_group.command(name="buffer", description="Chỉnh số tin nhắn bot lưu đệm ở kênh hiện tại")
     @app_commands.describe(size="Số lượng tin nhắn (Mặc định 20, khuyên dùng <= 50 để tiết kiệm token)")
     async def aimodel_buffer(self, interaction: discord.Interaction, size: int):
         self._reload_config()
@@ -223,7 +225,7 @@ class ChatAI(commands.Cog):
         
         await interaction.response.send_message(f"✅ Kênh này đã được chỉnh để ghi nhớ **{size}** tin nhắn gần nhất.", ephemeral=False)
 
-    @aimodel_group.command(name="intercept", description="Bật/Tắt tính năng bot tự động nói leo ngẫu nhiên")
+    @aichat_group.command(name="intercept", description="Bật/Tắt tính năng bot tự động nói leo ngẫu nhiên")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
     @app_commands.choices(state=[
         app_commands.Choice(name="Bật (On)", value="on"),
@@ -307,7 +309,7 @@ class ChatAI(commands.Cog):
         scored.sort(key=lambda x: x[0], reverse=True)
         return [doc for score, doc in scored[:top_k]]
 
-    @aimodel_group.command(name="library_set", description="Bật/Tắt kênh này làm Thư viện Nội bộ cho Bot học hỏi")
+    @ailibrary_group.command(name="set_channel", description="Bật/Tắt kênh này làm Thư viện Nội bộ cho Bot học hỏi")
     async def aimodel_library_set(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
@@ -350,7 +352,7 @@ class ChatAI(commands.Cog):
                 "url": msg.jump_url
             })
 
-    @aimodel_group.command(name="library_scan", description="Quét toàn bộ bài viết trong các kênh Thư viện để nạp vào não Bot")
+    @ailibrary_group.command(name="scan", description="Quét toàn bộ bài viết trong các kênh Thư viện để nạp vào não Bot")
     async def aimodel_library_scan(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
@@ -401,7 +403,7 @@ class ChatAI(commands.Cog):
         save_json(self.library_data, self.library_file)
         await interaction.followup.send(f"✅ Quét hoàn tất **{len(library_ids)}** kênh! Đã lưu tổng cộng **{len(docs)}** đoạn dữ liệu vào sổ tay của bot.")
 
-    @aimodel_group.command(name="library_clear", description="Xóa trắng dữ liệu Thư viện Nội bộ")
+    @ailibrary_group.command(name="clear", description="Xóa trắng dữ liệu Thư viện Nội bộ")
     async def aimodel_library_clear(self, interaction: discord.Interaction):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
@@ -438,7 +440,7 @@ class ChatAI(commands.Cog):
         msg = f"🔍 **Đang tra cứu Wiki cho:** `{query}`\n\n{wiki_data}\n\n*Gợi ý: Gọi bot trả lời cùng với thông tin này!*"
         await interaction.followup.send(msg)
 
-    @aimodel_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
+    @ailibrary_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
     @app_commands.choices(state=[
         app_commands.Choice(name="Bật (On)", value="on"),
@@ -466,7 +468,7 @@ class ChatAI(commands.Cog):
                 save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
 
-    @aimodel_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
+    @aichat_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
     @app_commands.choices(state=[
         app_commands.Choice(name="Bật (On)", value="on"),
