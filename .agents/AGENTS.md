@@ -30,3 +30,7 @@ Tuyệt đối KHÔNG dùng các lệnh như `git config user.name ...` hoặc `
 Việc này sẽ làm hỏng cấu hình Git cục bộ (local git config) của User.
 Thay vào đó, chỉ được phép ghi đè thông tin tác giả trực tiếp trên từng commit bằng cờ `--author`, ví dụ:
 `git commit --author="TNC_Data_Guard <guard@tnc-guild.com>" -m "..."`
+
+# LUẬT VIẾT COMMIT MESSAGE (100% TIẾNG VIỆT)
+Tất cả các mô tả commit (commit messages) do Bot tự động tạo ra hoặc do AI thực hiện (bằng lệnh `git commit`) BẮT BUỘC phải viết 100% bằng Tiếng Việt. 
+Ví dụ: `thêm_tính_năng(ai): bổ sung đếm số lượng request` thay vì `feat(ai): add request count`.

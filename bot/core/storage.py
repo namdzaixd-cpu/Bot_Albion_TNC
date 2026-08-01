@@ -42,7 +42,7 @@ def sync_to_github():
                 return
             subprocess.run(["git", "add", *existing_files], check=True, capture_output=True)
             commit_res = subprocess.run(
-                ["git", "commit", "--author=TNC_Data_Guard <guard@tnc-guild.com>", "-m", f"🤖 [Auto-Save] Session {BOT_SESSION_ID}"],
+                ["git", "commit", "--author=TNC_Data_Guard <guard@tnc-guild.com>", "-m", f"🤖 [Tự động lưu] Phiên làm việc {BOT_SESSION_ID}"],
                 capture_output=True, text=True,
             )
             if "nothing to commit" not in commit_res.stdout:
