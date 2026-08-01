@@ -502,11 +502,31 @@ class ChatAI(commands.Cog):
             return
 
         # Ghi nhớ tin nhắn vào bộ nhớ đệm của kênh
+        channel_id_str = str(message.channel.id)
+        if channel_id_str not in self.message_buffers:
+            size = self.ai_config.get("channel_buffers", {}).get(channel_id_str, 50)
+            self.message_buffers[channel_id_str] = collections.deque(maxlen=size)
+            try:
+                hist = []
+                async for m in message.channel.history(limit=size, before=message.created_at):
+                    if m.author.bot: continue
+                    r = [role.name for role in m.author.roles if role.name != '@everyone'] if isinstance(m.author, discord.Member) else []
+                    hist.append({
+                        "author": m.author.display_name,
+                        "roles": ", ".join(r) if r else "Member",
+                        "content": m.content
+                    })
+                hist.reverse()
+                for item in hist:
+                    self.message_buffers[channel_id_str].append(item)
+            except Exception as e:
+                print(f"Error pre-fetching history: {e}")
+
         author_roles = []
         if isinstance(message.author, discord.Member):
             author_roles = [r.name for r in message.author.roles if r.name != '@everyone']
             
-        self.get_buffer(str(message.channel.id)).append({
+        self.message_buffers[channel_id_str].append({
             "author": message.author.display_name,
             "roles": ", ".join(author_roles) if author_roles else "Member",
             "content": message.content
