@@ -247,8 +247,13 @@ class ChatAI(commands.Cog):
             return
 
         # Ghi nhớ tin nhắn vào bộ nhớ đệm của kênh
+        author_roles = []
+        if isinstance(message.author, discord.Member):
+            author_roles = [r.name for r in message.author.roles if r.name != '@everyone']
+            
         self.get_buffer(str(message.channel.id)).append({
             "author": message.author.display_name,
+            "roles": ", ".join(author_roles) if author_roles else "Member",
             "content": message.content
         })
 
@@ -338,7 +343,7 @@ class ChatAI(commands.Cog):
                         buffer = self.get_buffer(channel_id_str)
                         if len(buffer) > 0:
                             for msg_dict in buffer:
-                                context_data += f"[{msg_dict['author']}]: {msg_dict['content']}\n"
+                                context_data += f"[{msg_dict['author']} ({msg_dict.get('roles', 'Member')})]: {msg_dict['content']}\n"
                         else:
                             msg_count = 0
                             empty_count = 0
@@ -348,7 +353,12 @@ class ChatAI(commands.Cog):
                                     if not msg.content: 
                                         empty_count += 1
                                         continue
-                                    context_data += f"[{msg.author.display_name}]: {msg.content}\n"
+                                    roles_str = "Member"
+                                    if isinstance(msg.author, discord.Member):
+                                        roles = [r.name for r in msg.author.roles if r.name != '@everyone']
+                                        if roles:
+                                            roles_str = ", ".join(roles)
+                                    context_data += f"[{msg.author.display_name} ({roles_str})]: {msg.content}\n"
                                 
                                 if msg_count > 0 and msg_count == empty_count:
                                     context_data += f"[LỖI HỆ THỐNG: Đọc được {msg_count} tin nhắn nhưng TẤT CẢ đều rỗng.]\n"
