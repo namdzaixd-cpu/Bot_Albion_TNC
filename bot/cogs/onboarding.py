@@ -19,20 +19,46 @@ class OnboardConfig:
         save_json(self.data, self.file_path)
 
     @property
+    def is_enabled(self):
+        return self.data.get("is_enabled", True)
+        
+    @is_enabled.setter
+    def is_enabled(self, value: bool):
+        self.data["is_enabled"] = value
+        self.save()
+
+    @property
     def apply_channel_id(self):
         return self.data.get("apply_channel_id")
         
     @property
     def member_role_id(self):
         return self.data.get("member_role_id")
+        
+    @property
+    def officer_role_id(self):
+        return self.data.get("officer_role_id")
+        
+    @property
+    def rules_channel_id(self):
+        return self.data.get("rules_channel_id")
+        
+    @property
+    def content_channel_id(self):
+        return self.data.get("content_channel_id")
+        
+    @property
+    def question_channel_id(self):
+        return self.data.get("question_channel_id")
+
 
 class OfficerApprovalView(discord.ui.View):
-    def __init__(self, target_user_id: int, ign_name: str, yob: str, role_id: str):
+    def __init__(self, cog: 'Onboarding', target_user_id: int, ign_name: str, yob: str):
         super().__init__(timeout=None)
+        self.cog = cog
         self.target_user_id = target_user_id
         self.ign_name = ign_name
         self.yob = yob
-        self.role_id = role_id
 
     @discord.ui.button(label="Duyệt Lính", style=discord.ButtonStyle.green, custom_id="onboard_approve")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -41,12 +67,9 @@ class OfficerApprovalView(discord.ui.View):
             return
             
         await interaction.response.defer()
-        
         guild = interaction.guild
         member = guild.get_member(self.target_user_id)
         if member:
-            # Format nickname
-            # Ví dụ: '2000' -> '2k', '1999' -> '99'
             formatted_yob = self.yob
             if formatted_yob.isdigit():
                 if len(formatted_yob) == 4:
@@ -62,17 +85,17 @@ class OfficerApprovalView(discord.ui.View):
             try:
                 await member.edit(nick=new_nick)
             except discord.Forbidden:
-                pass # Can't edit owner/admin
+                pass
                 
-            if self.role_id:
-                role = guild.get_role(int(self.role_id))
+            role_id = self.cog.config.member_role_id
+            if role_id:
+                role = guild.get_role(int(role_id))
                 if role:
                     try:
                         await member.add_roles(role)
                     except discord.Forbidden:
                         pass
         
-        # Lock buttons
         for child in self.children:
             child.disabled = True
             
@@ -82,14 +105,17 @@ class OfficerApprovalView(discord.ui.View):
         embed.set_footer(text=f"Duyệt bởi {interaction.user.display_name}")
         await interaction.message.edit(embed=embed, view=self)
         
-        # Post the specific welcome message in the thread
+        c_rules = f"<#{self.cog.config.rules_channel_id}>" if self.cog.config.rules_channel_id else "《📋》𝐑𝐮𝐥𝐞𝐬"
+        c_content = f"<#{self.cog.config.content_channel_id}>" if self.cog.config.content_channel_id else "〔📰〕ᴄᴏɴᴛᴇɴᴛꜱ-ping🚩"
+        c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "🤔nghìn-lẻ-một-câu-hỏi-vì-sao🤔"
+        
         welcome_msg = (
             f"-Id Discord: <@{self.target_user_id}>\n"
-            f"Hãy đọc thật kỹ 《📋》𝐑𝐮𝐥𝐞𝐬 trước khi quyết định apply nhé.\n"
+            f"Hãy đọc thật kỹ {c_rules} trước khi quyết định apply nhé.\n"
             f"Nếu đã sẵn sàng, hãy đổi tên ở server Discord TNC theo form: \" [TNC] Ingame Tuổi \" (Bot đã tự đổi giúp bạn).\n"
             f"Apply vào guild The Northern Constellations trong game và đợi một lát để được duyệt.\n"
-            f"Sau khi vào guild, ghé 〔📰〕ᴄᴏɴᴛᴇɴᴛꜱ-ping🚩 để tham gia content cùng mọi người nhé.\n"
-            f"Có thắc mắc gì về game thì vào 🤔nghìn-lẻ-một-câu-hỏi-vì-sao🤔 hỏi, anh em sẽ giải đáp cho.\n"
+            f"Sau khi vào guild, ghé {c_content} để tham gia content cùng mọi người nhé.\n"
+            f"Có thắc mắc gì về game thì vào {c_question} hỏi, anh em sẽ giải đáp cho.\n"
             f"Khi vào guild hãy cư xử đúng mực, kính trên nhường dưới, không toxic không gây war nhaa.\n"
             f"Chúc bạn một ngày vui vẻ ❤️"
         )
@@ -102,7 +128,6 @@ class OfficerApprovalView(discord.ui.View):
             return
             
         await interaction.response.defer()
-        
         for child in self.children:
             child.disabled = True
             
@@ -137,39 +162,64 @@ class Onboarding(commands.Cog):
         except:
             return None
 
-    @commands.Cog.listener()
-    async def on_thread_create(self, thread: discord.Thread):
-        apply_ch = self.config.apply_channel_id
-        if not apply_ch or str(thread.parent_id) != str(apply_ch):
+    def validate_form(self, content: str):
+        keywords = ["ingame", "năm sinh", "giới tính", "quốc gia", "thời gian", "mic", "chơi pc", "mobile", "role", "guild", "mục đích", "quy định"]
+        count = sum(1 for kw in keywords if kw in content.lower())
+        return count >= 4  
+
+    async def process_apply_thread(self, thread: discord.Thread, msg: discord.Message = None):
+        if not msg:
+            async for m in thread.history(limit=5, oldest_first=True):
+                if m.author.id == thread.owner_id:
+                    msg = m
+                    break
+        if not msg:
             return
             
-        # Nghỉ 2 giây để Discord post xong message đầu tiên vào thread
-        await asyncio.sleep(2)
+        content = msg.content
         
-        # Fetch the first message of the thread
-        initial_msg = None
-        async for msg in thread.history(limit=5, oldest_first=True):
-            if msg.author.id == thread.owner_id:
-                initial_msg = msg
-                break
-                
-        if not initial_msg:
-            return
-            
-        content = initial_msg.content
-        
-        # Extract Ingame and Năm sinh
-        ign_match = re.search(r'Ingame\s*:\s*(.+)', content, re.IGNORECASE)
-        yob_match = re.search(r'Năm sinh\s*:\s*(.+)', content, re.IGNORECASE)
+        ign_match = re.search(r'Ingame\s*[:\-]?\s*([a-zA-Z0-9_]+)', content, re.IGNORECASE)
+        yob_match = re.search(r'Năm sinh\s*[:\-]?\s*([a-zA-Z0-9]+)', content, re.IGNORECASE)
         
         if not ign_match:
-            await thread.send("⚠️ Bot không tìm thấy mục `Ingame:` trong form của bạn. Vui lòng tạo đúng mẫu để tự động tra cứu!")
+            if not self.validate_form(content): return 
+            await thread.send("⚠️ Bot không tìm thấy mục `Ingame:` trong đơn. Hãy viết rõ form `Ingame : Tên` nhé!")
+            return
+            
+        if not self.validate_form(content):
+            await thread.send("⚠️ Bro điền thiếu form rồi kìa, hãy điền đầy đủ form mẫu nhé!")
+            return
+            
+        has_image = False
+        if msg.attachments:
+            for att in msg.attachments:
+                if att.content_type and att.content_type.startswith("image/"):
+                    has_image = True
+                    break
+        if "http" in content.lower() and ("png" in content.lower() or "jpg" in content.lower() or "jpeg" in content.lower() or "discord" in content.lower()):
+            has_image = True
+            
+        if not has_image:
+            async for m in thread.history(limit=10, oldest_first=True):
+                if m.author.id == thread.owner_id and (m.attachments or "http" in m.content):
+                    has_image = True
+                    break
+
+        if not has_image:
+            # Check if bot already asked for image to prevent spamming
+            already_asked = False
+            async for m in thread.history(limit=10, oldest_first=True):
+                if m.author == self.bot.user and "xin thêm ảnh stat" in m.content.lower():
+                    already_asked = True
+                    break
+            
+            if not already_asked:
+                await thread.send("Bro ơi cho tui xin thêm ảnh stat ingame nhé.")
             return
             
         ign = ign_match.group(1).strip()
         yob = yob_match.group(1).strip() if yob_match else ""
         
-        # Gọi API kiểm tra
         api_data = await self.fetch_albion_player(ign)
         if not api_data:
             await thread.send(f"❌ Không tìm thấy nhân vật `{ign}` trên hệ thống Albion. Officer vui lòng kiểm tra thủ công.")
@@ -188,33 +238,83 @@ class Onboarding(commands.Cog):
         old_guild = api_data.get('GuildName', 'Không có')
         embed.add_field(name="Guild Hiện Tại / Cũ", value=old_guild, inline=False)
         
-        view = OfficerApprovalView(thread.owner_id, api_data.get('Name'), yob, self.config.member_role_id)
-        await thread.send(embed=embed, view=view)
+        view = OfficerApprovalView(self, thread.owner_id, api_data.get('Name'), yob)
+        
+        officer_mention = f"<@&{self.config.officer_role_id}>" if self.config.officer_role_id else "@Officer"
+        await thread.send(content=f"Đã kiểm tra xong thông tin! Mời {officer_mention} vào xem xét duyệt nhé.", embed=embed, view=view)
 
 
-    onboard_group = app_commands.Group(name="onboard", description="Cài đặt tính năng tự động lọc lính mới qua Diễn đàn")
+    @commands.Cog.listener()
+    async def on_thread_create(self, thread: discord.Thread):
+        if not self.config.is_enabled: return
+        apply_ch = self.config.apply_channel_id
+        if not apply_ch or str(thread.parent_id) != str(apply_ch):
+            return
+            
+        await asyncio.sleep(2)
+        await self.process_apply_thread(thread)
 
-    @onboard_group.command(name="set_apply_channel", description="Cài đặt kênh Diễn đàn (Forum) dùng để Nộp đơn")
-    @app_commands.describe(channel="Chọn kênh diễn đàn (Apply channel)")
-    async def onboard_set_apply_channel(self, interaction: discord.Interaction, channel: discord.abc.GuildChannel):
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if not self.config.is_enabled: return
+        if message.author.bot: return
+        if not isinstance(message.channel, discord.Thread): return
+        
+        apply_ch = self.config.apply_channel_id
+        if not apply_ch or str(message.channel.parent_id) != str(apply_ch):
+            return
+            
+        if message.author.id != message.channel.owner_id:
+            return
+            
+        async for m in message.channel.history(limit=20):
+            if m.author == self.bot.user and m.embeds and "Báo cáo tự động" in str(m.embeds[0].title):
+                return
+                
+        if message.attachments or "http" in message.content:
+            await self.process_apply_thread(message.channel)
+
+
+    onboard_group = app_commands.Group(name="onboard", description="Hệ thống Bot Thư Ký duyệt đơn")
+
+    @onboard_group.command(name="toggle", description="Bật/Tắt chế độ Thư Ký tự động")
+    async def onboard_toggle(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
+            return
+        self.config.is_enabled = not self.config.is_enabled
+        status = "BẬT" if self.config.is_enabled else "TẮT"
+        await interaction.response.send_message(f"✅ Đã **{status}** tính năng tự động check đơn lính mới.", ephemeral=True)
+
+    @onboard_group.command(name="setup_channels", description="Cài đặt các kênh cần thiết để bot tag trong lời chào")
+    async def onboard_setup_channels(self, interaction: discord.Interaction, 
+                                     apply: discord.abc.GuildChannel,
+                                     rules: discord.abc.GuildChannel,
+                                     content: discord.abc.GuildChannel,
+                                     question: discord.abc.GuildChannel):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
-            
-        self.config.data["apply_channel_id"] = str(channel.id)
+        
+        self.config.data["apply_channel_id"] = str(apply.id)
+        self.config.data["rules_channel_id"] = str(rules.id)
+        self.config.data["content_channel_id"] = str(content.id)
+        self.config.data["question_channel_id"] = str(question.id)
         self.config.save()
-        await interaction.response.send_message(f"✅ Đã đặt kênh diễn đàn {channel.mention} làm nơi Bot túc trực đọc đơn lính mới.", ephemeral=True)
+        await interaction.response.send_message("✅ Đã lưu cấu hình 4 kênh thành công!", ephemeral=True)
 
-    @onboard_group.command(name="set_role", description="Cài đặt Role sẽ được tự động cấp sau khi duyệt")
-    @app_commands.describe(role="Chọn Role Thành viên chính thức")
-    async def onboard_set_role(self, interaction: discord.Interaction, role: discord.Role):
+    @onboard_group.command(name="setup_roles", description="Cài đặt Role Officer và Role Member")
+    async def onboard_setup_roles(self, interaction: discord.Interaction, 
+                                  officer_role: discord.Role,
+                                  member_role: discord.Role):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
-            
-        self.config.data["member_role_id"] = str(role.id)
+        
+        self.config.data["officer_role_id"] = str(officer_role.id)
+        self.config.data["member_role_id"] = str(member_role.id)
         self.config.save()
-        await interaction.response.send_message(f"✅ Đã cài đặt tự động cấp role `{role.name}` cho lính mới sau khi duyệt.", ephemeral=True)
+        await interaction.response.send_message(f"✅ Đã lưu cấu hình Role!", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Onboarding(bot))
