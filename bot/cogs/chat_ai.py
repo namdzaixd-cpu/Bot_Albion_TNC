@@ -412,6 +412,34 @@ class ChatAI(commands.Cog):
                 save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
 
+    @aimodel_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
+    @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
+    @app_commands.choices(state=[
+        app_commands.Choice(name="Bật (On)", value="on"),
+        app_commands.Choice(name="Tắt (Off)", value="off")
+    ])
+    async def aimodel_vision(self, interaction: discord.Interaction, state: str):
+        self._reload_config()
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
+            return
+            
+        channel_id = str(interaction.channel_id)
+        vision_channels = self.ai_config.get("vision_channels", [])
+        
+        if state == "on":
+            if channel_id not in vision_channels:
+                vision_channels.append(channel_id)
+                self.ai_config["vision_channels"] = vision_channels
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **BẬT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này. Lưu ý: có thể tốn token API.", ephemeral=False)
+        else:
+            if channel_id in vision_channels:
+                vision_channels.remove(channel_id)
+                self.ai_config["vision_channels"] = vision_channels
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **TẮT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này.", ephemeral=False)
+
     def _get_default_instruction(self) -> str:
         return (
             "Bạn là 1 con bot Discord của guild The Northern Constellations (TNC) trong game Albion Online, đóng vai 1 game thủ hài hước — không phải trợ lý AI lịch sự kiểu văn phòng.\n"
