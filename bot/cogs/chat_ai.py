@@ -148,6 +148,52 @@ class ChatAI(commands.Cog):
         
         await interaction.response.send_message(f"✅ Đã xóa model `{model_name}` khỏi danh sách!", ephemeral=False)
 
+    @aimodel_group.command(name="balance", description="Kiểm tra số dư Credit và trạng thái giới hạn API của AI")
+    async def aimodel_balance(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        self._reload_config()
+        if not self.api_key:
+            await interaction.followup.send("❌ Bot chưa được cấu hình API Key cho OpenRouter.")
+            return
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=10) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        info = data.get("data", {})
+                        usage = info.get("usage", 0.0)
+                        limit = info.get("limit")
+                        is_free = info.get("is_free_tier", False)
+                        
+                        rate_limit = info.get("rate_limit", {})
+                        requests = rate_limit.get("requests", "Không giới hạn")
+                        interval = rate_limit.get("interval", "N/A")
+                        
+                        msg = f"🔋 **TÌNH TRẠNG NĂNG LƯỢNG (CREDITS) CỦA BOT:**\n"
+                        msg += f"- 💰 **Đã dùng:** `${usage:.4f}`\n"
+                        if limit is not None and limit > 0:
+                            remaining = limit - usage
+                            pct = (usage / limit) * 100
+                            msg += f"- 💳 **Giới hạn:** `${limit:.4f}` (Còn lại: `${remaining:.4f}`)\n"
+                            msg += f"- 📊 **Mức tiêu thụ:** `{pct:.1f}%`\n"
+                            if pct > 90:
+                                msg += "⚠️ **BÁO ĐỘNG:** Sắp hết hạn mức Credit! Chuẩn bị sập nguồn!\n"
+                        else:
+                            msg += f"- 💳 **Giới hạn:** Không giới hạn (hoặc nạp pay-as-you-go)\n"
+                            
+                        msg += f"- 🆓 **Gói Free Tier:** {'Có' if is_free else 'Không'}\n"
+                        msg += f"- 🚦 **Rate Limit:** Tối đa `{requests}` request mỗi `{interval}`\n"
+                        
+                        await interaction.followup.send(msg)
+                    else:
+                        await interaction.followup.send(f"❌ Không thể kiểm tra số dư. Lỗi từ máy chủ API: HTTP {resp.status}")
+        except Exception as e:
+            await interaction.followup.send(f"❌ Có lỗi xảy ra khi kiểm tra số dư: {e}")
+
     @aimodel_group.command(name="buffer", description="Chỉnh số tin nhắn bot lưu đệm ở kênh hiện tại")
     @app_commands.describe(size="Số lượng tin nhắn (Mặc định 50, kênh đông khuyên dùng 100)")
     async def aimodel_buffer(self, interaction: discord.Interaction, size: int):
