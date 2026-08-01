@@ -3,6 +3,11 @@ import re
 import aiohttp
 import collections
 import random
+import asyncio
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
 from bs4 import BeautifulSoup
 import discord
 from discord import app_commands
@@ -34,6 +39,8 @@ class ChatAI(commands.Cog):
             self.ai_config["channel_buffers"] = {}
         if "intercept_channels" not in self.ai_config:
             self.ai_config["intercept_channels"] = []
+        if "autowiki_channels" not in self.ai_config:
+            self.ai_config["autowiki_channels"] = []
             
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
         self.available_models = self.ai_config.get("available_models", [
@@ -185,6 +192,61 @@ class ChatAI(commands.Cog):
                 save_json(self.ai_config, self.ai_config_file)
             await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
 
+    async def _search_wiki_async(self, query: str) -> str:
+        if DDGS is None:
+            return "[LỖI: Chưa cài thư viện duckduckgo-search]"
+        try:
+            def _sync_search():
+                results = DDGS().text(f"site:wiki.albiononline.com {query}", max_results=3)
+                return list(results)
+            
+            results = await asyncio.to_thread(_sync_search)
+            if not results:
+                return "[Không tìm thấy thông tin trên Albion Wiki]"
+            
+            wiki_text = "Dữ liệu cào được từ Albion Wiki:\n"
+            for r in results:
+                wiki_text += f"- {r.get('title', '')}: {r.get('body', '')}\n"
+            return wiki_text
+        except Exception as e:
+            return f"[Lỗi tra cứu Wiki: {e}]"
+
+    @app_commands.command(name="wiki", description="Tra cứu kiến thức chuẩn từ Albion Wiki")
+    @app_commands.describe(query="Từ khóa cần tra cứu (VD: bloodletter, thetford cape)")
+    async def cmd_wiki(self, interaction: discord.Interaction, query: str):
+        await interaction.response.defer(ephemeral=False)
+        wiki_data = await self._search_wiki_async(query)
+        msg = f"🔍 **Đang tra cứu Wiki cho:** `{query}`\n\n{wiki_data}\n\n*Gợi ý: Gọi bot trả lời cùng với thông tin này!*"
+        await interaction.followup.send(msg)
+
+    @aimodel_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
+    @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
+    @app_commands.choices(state=[
+        app_commands.Choice(name="Bật (On)", value="on"),
+        app_commands.Choice(name="Tắt (Off)", value="off")
+    ])
+    async def aimodel_autowiki(self, interaction: discord.Interaction, state: str):
+        self._reload_config()
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
+            return
+            
+        channel_id = str(interaction.channel_id)
+        autowiki = self.ai_config.get("autowiki_channels", [])
+        
+        if state == "on":
+            if channel_id not in autowiki:
+                autowiki.append(channel_id)
+                self.ai_config["autowiki_channels"] = autowiki
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **BẬT** tính năng Tự động tra cứu Wiki cho kênh này. Bot sẽ thông minh hơn nhưng phản hồi chậm đi 1-2 giây.", ephemeral=False)
+        else:
+            if channel_id in autowiki:
+                autowiki.remove(channel_id)
+                self.ai_config["autowiki_channels"] = autowiki
+                save_json(self.ai_config, self.ai_config_file)
+            await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
+
     def _get_default_instruction(self) -> str:
         return (
             "Bạn là 1 con bot Discord của guild The Northern Constellations (TNC) trong game Albion Online, đóng vai 1 game thủ hài hước — không phải trợ lý AI lịch sự kiểu văn phòng.\n"
@@ -321,6 +383,16 @@ class ChatAI(commands.Cog):
         channel_mentions = re.findall(r'<#(\d+)>', content)
         link_mentions = re.findall(r'discord\.com/channels/\d+/(\d+)', content)
         
+        # Auto Wiki Search
+        wiki_context = ""
+        autowiki = self.ai_config.get("autowiki_channels", [])
+        if channel_id_str in autowiki and is_mentioned and not is_random_intercept:
+            question_keywords = ["là gì", "thế nào", "cách", "hướng dẫn", "tác dụng", "cơ chế", "chỉ số", "chiêu", "skill", "item", "vũ khí", "áo", "mũ", "giày", "?", "wiki", "tìm hiểu", "cho hỏi", "dùng để"]
+            if any(kw in content_lower for kw in question_keywords):
+                await message.channel.typing()
+                wiki_data = await self._search_wiki_async(content)
+                wiki_context = f"--- Dữ liệu tra cứu tự động từ Albion Wiki ---\n{wiki_data}\n--------------------------------------\n\n"
+        
         all_channel_ids = list(set(channel_mentions + link_mentions))
         
         # Luôn thêm kênh hiện tại vào để bot hiểu ngữ cảnh trò chuyện đang diễn ra
@@ -429,8 +501,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context or web_context:
-            prompt = guild_info + context_data + reply_context + web_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context or wiki_context:
+            prompt = guild_info + context_data + reply_context + web_context + wiki_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             

@@ -61,7 +61,9 @@ FEATURE_FIELDS = [
         "`/aimodel add` (thêm model — Officer)\n"
         "`/aimodel remove` (xóa model — Officer)\n"
         "`/aimodel buffer` (chỉnh bộ nhớ đệm — Officer)\n"
-        "`/aimodel intercept` (bật/tắt nói leo — Officer)",
+        "`/aimodel intercept` (bật/tắt nói leo — Officer)\n"
+        "`/aimodel autowiki` (bật tắt tra Wiki tự động — Officer)\n"
+        "`/wiki` (tra cứu Wiki Albion thủ công)",
     ),
 ]
 
