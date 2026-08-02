@@ -359,6 +359,10 @@ class Onboarding(commands.Cog):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
+            
+        if not isinstance(apply, discord.ForumChannel):
+            await interaction.response.send_message("❌ Kênh Apply bắt buộc phải là một **Kênh Diễn Đàn (Forum Channel)**! Vui lòng tạo một kênh Diễn đàn mới hoặc chọn đúng kênh Diễn đàn.", ephemeral=True)
+            return
         
         self.config.data["apply_channel_id"] = str(apply.id)
         self.config.save()
