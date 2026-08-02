@@ -17,8 +17,17 @@ OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 # URL Ollama cố định, không cần nhập lại
 ollama_url = "https://ollama.com/api"
 
-model_input = input("Nhập tên model Ollama (Mặc định: llama3): ").strip()
-model = model_input if model_input else "llama3"
+print("Chọn model Ollama:")
+print("1. minimax-m3")
+print("2. gpt-oss:120b")
+model_input = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
+
+if model_input == "2":
+    model = "gpt-oss:120b"
+elif model_input == "1" or not model_input:
+    model = "minimax-m3"
+else:
+    model = model_input
 
 # Chuẩn hóa URL để tránh trùng lặp cụm /api/chat hoặc /api
 url_clean = ollama_url.rstrip('/')
