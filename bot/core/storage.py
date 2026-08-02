@@ -30,6 +30,7 @@ GITHUB_SYNCED_FILES = [
     "bot/Storage/tnc_coreconfig_v1.json",
     "bot/Storage/tnc_core_credited_v1.json",
     "bot/Storage/tnc_library_v1.json",
+    "bot/Storage/global_blacklist_v1.json",
 ]
 
 

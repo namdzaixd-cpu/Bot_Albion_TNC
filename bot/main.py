@@ -20,6 +20,7 @@ EXTENSIONS = [
     "cogs.corebank",
     "cogs.chat_ai",
     "cogs.onboarding",
+    "cogs.blacklist",
 ]
 
 
