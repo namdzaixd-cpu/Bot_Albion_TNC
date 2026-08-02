@@ -300,6 +300,11 @@ class Onboarding(commands.Cog):
         if message.author.id != message.channel.owner_id:
             return
             
+        # Nếu đây là tin nhắn gốc (starter message) của Thread, xử lý luôn
+        if message.id == message.channel.id:
+            await self.process_apply_thread(message.channel, msg=message)
+            return
+            
         async for m in message.channel.history(limit=20):
             if m.author == self.bot.user and m.embeds and "Báo cáo tự động" in str(m.embeds[0].title):
                 return
