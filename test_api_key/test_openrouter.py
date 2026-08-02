@@ -50,8 +50,17 @@ def choose_model():
     else:
         return model_choice
 
+def check_free_model(model):
+    """Chặn model trả phí để tránh phát sinh chi phí ngoài ý muốn."""
+    if not (model.endswith(":free") or model.endswith("/free")):
+        print("\n❌ [CẢNH BÁO BẢO VỆ CHI PHÍ]:")
+        print(f"Yêu cầu gọi model '{model}' qua OpenRouter đã bị chặn vì không có hậu tố ':free' hoặc '/free'.")
+        print("Vui lòng chỉ sử dụng các model miễn phí để tránh phát sinh chi phí ngoài ý muốn!\n")
+        raise SystemExit(1)
+
 # Khởi tạo model lần đầu
 model = choose_model()
+check_free_model(model)
 
 print(f"\n[OpenRouter] Đang sử dụng model: {model}")
 print("Gõ câu hỏi rồi Enter (Ctrl+C để thoát):\n")
@@ -65,6 +74,7 @@ while True:
     if question.lower() == "/model":
         print()
         model = choose_model()
+        check_free_model(model)
         print(f"🔄 Đã chuyển sang model: {model}\n")
         continue
 

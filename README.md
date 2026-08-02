@@ -52,19 +52,20 @@ Cog `chat_ai` hỗ trợ 2 nhà cung cấp model, chọn qua tên model:
 
 ### Test AI chat ngoài Discord
 
-2 script độc lập trong `bot/`, cùng lấy `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` từ `.env` qua `core/config.py` (đổi model/key ở `.env` thì cả 2 script lẫn bot chính đều dùng chung giá trị mới):
+Bộ script độc lập trong [test_api_key/](test_api_key/README.md), cùng lấy API key từ `.env` qua `core/config.py` (đổi model/key ở `.env` thì cả script lẫn bot chính đều dùng chung giá trị mới):
 
 | File | Công dụng |
 |---|---|
-| `bot/test_openrouter_full.py` | Gọi kèm system instruction thật từ `chat_ai_instruction.txt` — mô phỏng đúng điều kiện production |
-| `bot/test_openrouter_baseline.py` | Gọi trần, không có system instruction — đo độ trễ gốc của API/model, dùng để so sánh xem prompt tính cách có làm chậm phản hồi hay không |
+| `test_api_key/test_api_full_with_instruction.py` | Gộp cả 3 nhà cung cấp (13 model), gọi kèm system instruction thật từ `chat_ai_instruction.txt` — mô phỏng đúng điều kiện production |
+| `test_api_key/test_api_full.py` | Gộp cả 3 nhà cung cấp (13 model), gọi trần không có system instruction — đo độ trễ gốc của API/model, dùng để so sánh xem prompt tính cách có làm chậm phản hồi hay không |
+| `test_api_key/test_gemini.py`, `test_ollama.py`, `test_openrouter.py` | Test riêng lẻ từng nhà cung cấp |
 
 ```bash
-python bot/test_openrouter_full.py
-python bot/test_openrouter_baseline.py
+python3 test_api_key/test_api_full_with_instruction.py
+python3 test_api_key/test_api_full.py
 ```
 
-Gõ câu hỏi rồi Enter, script in ra `[X.XXs] <câu trả lời>` — số giây là thời gian phản hồi thật từ OpenRouter, không qua Discord.
+Gõ câu hỏi rồi Enter, script in ra `[X.XXs] <câu trả lời>` — số giây là thời gian phản hồi thật từ API, không qua Discord.
 
 ## Lưu trữ dữ liệu
 
