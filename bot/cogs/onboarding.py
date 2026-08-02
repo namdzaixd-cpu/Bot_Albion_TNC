@@ -176,7 +176,7 @@ class Onboarding(commands.Cog):
     async def fetch_albion_player(self, ign: str):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"https://gameinfo.albiononline.com/api/gameinfo/search?q={ign}") as resp:
+                async with session.get(f"https://gameinfo-sgp.albiononline.com/api/gameinfo/search?q={ign}") as resp:
                     if resp.status != 200: return None
                     data = await resp.json()
                     players = data.get("players", [])
@@ -186,7 +186,7 @@ class Onboarding(commands.Cog):
                     if not player: return None
                     player_id = player["Id"]
                 
-                async with session.get(f"https://gameinfo.albiononline.com/api/gameinfo/players/{player_id}") as resp:
+                async with session.get(f"https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}") as resp:
                     if resp.status != 200: return None
                     return await resp.json()
         except Exception:
