@@ -296,16 +296,6 @@ class Onboarding(commands.Cog):
 
 
     @commands.Cog.listener()
-    async def on_thread_create(self, thread: discord.Thread):
-        if not self.config.is_enabled: return
-        apply_ch = self.config.apply_channel_id
-        if not apply_ch or str(thread.parent_id) != str(apply_ch):
-            return
-            
-        await asyncio.sleep(2)
-        await self.process_apply_thread(thread)
-
-    @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not self.config.is_enabled: return
         if message.author.bot: return
