@@ -19,8 +19,16 @@ Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh g
 gate này — chỉ áp dụng cho việc *viết/sửa* code.
 
 Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` luôn, không cần hỏi lại
-"commit đi?" — user đã cấp quyền chuẩn. Riêng `git push` lên remote thì vẫn phải hỏi xác nhận
-trước như bình thường (ảnh hưởng shared state, rủi ro cao hơn commit local).
+"commit đi?" — user đã cấp quyền chuẩn.
+
+Trước khi `git push`: đây là dự án dùng chung (có thể có người khác đã push thay đổi lên GitHub),
+nên BẮT BUỘC `git fetch` rồi kiểm tra xem remote (`origin/<branch>`) có commit mới nào mà local
+chưa có không.
+- Nếu remote không có gì mới, hoặc có commit mới nhưng merge/rebase sạch không xung đột: push
+  luôn, không cần hỏi lại.
+- Nếu phát hiện xung đột (cùng sửa 1 đoạn code, hoặc merge/rebase báo conflict): DỪNG LẠI, KHÔNG
+  tự ý resolve — báo rõ cho user biết file nào xung đột, xung đột với commit nào, và chờ user
+  quyết định cách xử lý.
 
 ## Nguyên tắc code (Karpathy guidelines)
 
