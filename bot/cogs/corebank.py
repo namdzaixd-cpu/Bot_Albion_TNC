@@ -249,7 +249,11 @@ class CoreBankCog(commands.Cog):
             
         channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
         if not channel:
-            return
+            try:
+                channel = await guild.fetch_channel(payload.channel_id)
+            except Exception:
+                return
+
             
         is_core = str(payload.channel_id) == core_ch_id
         if not is_core and hasattr(channel, "parent_id"):
@@ -368,7 +372,11 @@ class CoreBankCog(commands.Cog):
             
         channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
         if not channel:
-            return
+            try:
+                channel = await guild.fetch_channel(payload.channel_id)
+            except Exception:
+                return
+
             
         is_core = str(payload.channel_id) == core_ch_id
         if not is_core and hasattr(channel, "parent_id"):
