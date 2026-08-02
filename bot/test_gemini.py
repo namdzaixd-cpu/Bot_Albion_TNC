@@ -17,7 +17,7 @@ def choose_model():
     print("1. gemini-3.5-flash-lite")
     print("2. gemini-3.1-flash-lite")
     print("3. gemma-4-31b-it")
-    print("4. gemini-2.5-flash-lite")
+    print("4. gemini-2.5-flash")
     model_choice = input("Lựa chọn (1-4, Mặc định: 1): ").strip()
     
     if model_choice == "2":
@@ -25,7 +25,7 @@ def choose_model():
     elif model_choice == "3":
         return "gemma-4-31b-it"
     elif model_choice == "4":
-        return "gemini-2.5-flash-lite"
+        return "gemini-2.5-flash"
     elif model_choice == "1" or not model_choice:
         return "gemini-3.5-flash-lite"
     else:
