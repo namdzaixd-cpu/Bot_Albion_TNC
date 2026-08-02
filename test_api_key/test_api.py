@@ -25,54 +25,62 @@ if not GEMINI_API_KEY:
 if not OPENROUTER_API_KEY:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
-def choose_provider():
-    print("=== CHỌN NHÀ CUNG CẤP AI ===")
-    print("1. Google Gemini (Gọi trực tiếp AI Studio)")
-    print("2. Ollama (Cấu hình cứng URL https://ollama.com/api)")
-    print("3. OpenRouter")
-    choice = input("Lựa chọn (1-3, Mặc định: 1): ").strip()
-    if choice in ("2", "3"):
-        return choice
-    return "1"
-
-def choose_model(provider):
-    if provider == "1":
-        print("\nChọn model Gemini:")
-        print("1. gemini-3.5-flash-lite")
-        print("2. gemini-3.1-flash-lite")
-        print("3. gemma-4-31b-it")
-        print("4. gemini-2.5-flash")
-        choice = input("Lựa chọn (1-4, Mặc định: 1): ").strip()
-        if choice == "2": return "gemini-3.1-flash-lite"
-        elif choice == "3": return "gemma-4-31b-it"
-        elif choice == "4": return "gemini-2.5-flash"
-        return "gemini-3.5-flash-lite"
-        
-    elif provider == "2":
-        print("\nChọn model Ollama:")
-        print("1. minimax-m3")
-        print("2. gpt-oss:120b")
-        choice = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
-        if choice == "2": return "gpt-oss:120b"
-        return "minimax-m3"
-        
+def choose_model():
+    print("=== DANH SÁCH 13 MODEL HỖ TRỢ ===")
+    print("[Google Gemini]")
+    print("  1. gemini-3.5-flash-lite")
+    print("  2. gemini-3.1-flash-lite")
+    print("  3. gemma-4-31b-it")
+    print("  4. gemini-2.5-flash")
+    print("[Ollama]")
+    print("  5. minimax-m3")
+    print("  6. gpt-oss:120b")
+    print("[OpenRouter]")
+    print("  7. nvidia/nemotron-3-ultra-550b-a55b:free")
+    print("  8. inclusionai/ling-3.0-flash:free")
+    print("  9. poolside/laguna-s-2.1:free")
+    print("  10. nvidia/nemotron-3-super-120b-a12b:free")
+    print("  11. cohere/north-mini-code:free")
+    print("  12. poolside/laguna-xs-2.1:free")
+    print("  13. openrouter/free")
+    
+    choice = input("Lựa chọn của bạn (1-13, Mặc định: 1): ").strip()
+    
+    if choice == "2":
+        return "1", "gemini-3.1-flash-lite"
+    elif choice == "3":
+        return "1", "gemma-4-31b-it"
+    elif choice == "4":
+        return "1", "gemini-2.5-flash"
+    elif choice == "5":
+        return "2", "minimax-m3"
+    elif choice == "6":
+        return "2", "gpt-oss:120b"
+    elif choice == "7":
+        return "3", "nvidia/nemotron-3-ultra-550b-a55b:free"
+    elif choice == "8":
+        return "3", "inclusionai/ling-3.0-flash:free"
+    elif choice == "9":
+        return "3", "poolside/laguna-s-2.1:free"
+    elif choice == "10":
+        return "3", "nvidia/nemotron-3-super-120b-a12b:free"
+    elif choice == "11":
+        return "3", "cohere/north-mini-code:free"
+    elif choice == "12":
+        return "3", "poolside/laguna-xs-2.1:free"
+    elif choice == "13":
+        return "3", "openrouter/free"
+    elif choice == "1" or not choice:
+        return "1", "gemini-3.5-flash-lite"
     else:
-        print("\nChọn model OpenRouter:")
-        print("1. nvidia/nemotron-3-ultra-550b-a55b:free")
-        print("2. inclusionai/ling-3.0-flash:free")
-        print("3. poolside/laguna-s-2.1:free")
-        print("4. nvidia/nemotron-3-super-120b-a12b:free")
-        print("5. cohere/north-mini-code:free")
-        print("6. poolside/laguna-xs-2.1:free")
-        print("7. openrouter/free")
-        choice = input("Lựa chọn (1-7, Mặc định: 1): ").strip()
-        if choice == "2": return "inclusionai/ling-3.0-flash:free"
-        elif choice == "3": return "poolside/laguna-s-2.1:free"
-        elif choice == "4": return "nvidia/nemotron-3-super-120b-a12b:free"
-        elif choice == "5": return "cohere/north-mini-code:free"
-        elif choice == "6": return "poolside/laguna-xs-2.1:free"
-        elif choice == "7": return "openrouter/free"
-        return "nvidia/nemotron-3-ultra-550b-a55b:free"
+        # Nếu nhập custom model ngoài danh sách
+        print("\nChọn nhà cung cấp cho model custom này:")
+        print("1. Google Gemini")
+        print("2. Ollama")
+        print("3. OpenRouter")
+        provider_choice = input("Lựa chọn (1-3, Mặc định: 1): ").strip()
+        provider = provider_choice if provider_choice in ("2", "3") else "1"
+        return provider, choice
 
 def get_api_setup(provider, model):
     if provider == "1":
@@ -106,32 +114,23 @@ def get_api_setup(provider, model):
         return url, headers
 
 # Bắt đầu thiết lập ban đầu
-provider = choose_provider()
-model = choose_model(provider)
+provider, model = choose_model()
 url, headers = get_api_setup(provider, model)
 
 provider_names = {"1": "Gemini", "2": "Ollama", "3": "OpenRouter"}
 print(f"\n[{provider_names[provider]}] Đang kết nối tới: {url}")
 print(f"[{provider_names[provider]}] Đang sử dụng model: {model}")
-print("Gõ câu hỏi rồi Enter (Ctrl+C để thoát), gõ `/model` để đổi model, gõ `/provider` để đổi nhà cung cấp.\n")
+print("Gõ câu hỏi rồi Enter (Ctrl+C để thoát), gõ `/model` để đổi model hoặc nhà cung cấp.\n")
 
 while True:
     question = input("> ").strip()
     if not question:
         continue
 
-    # Đổi model của nhà cung cấp hiện tại
+    # Đổi model hoặc provider
     if question.lower() == "/model":
-        model = choose_model(provider)
-        url, headers = get_api_setup(provider, model)
-        print(f"🔄 Đã chuyển sang model: {model}\n")
-        continue
-
-    # Đổi nhà cung cấp khác
-    if question.lower() == "/provider":
         print()
-        provider = choose_provider()
-        model = choose_model(provider)
+        provider, model = choose_model()
         url, headers = get_api_setup(provider, model)
         print(f"🔄 Đã chuyển sang: {provider_names[provider]} | Model: {model}\n")
         continue
