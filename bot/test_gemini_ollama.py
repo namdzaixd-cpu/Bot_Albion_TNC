@@ -40,7 +40,14 @@ elif choice == "2":
     model_input = input("Nhập tên model Ollama (Mặc định: llama3): ").strip()
     model = model_input if model_input else "llama3"
     
-    url = f"{ollama_url.rstrip('/')}/api/chat"
+    # Chuẩn hóa URL để tránh trùng lặp cụm /api/chat hoặc /api
+    url_clean = ollama_url.rstrip('/')
+    if url_clean.endswith("/api/chat"):
+        url = url_clean
+    elif url_clean.endswith("/api"):
+        url = f"{url_clean}/chat"
+    else:
+        url = f"{url_clean}/api/chat"
     print(f"\n[Ollama] Đang kết nối tới: {url} | Model: {model}")
 else:
     raise SystemExit("Lựa chọn không hợp lệ!")
