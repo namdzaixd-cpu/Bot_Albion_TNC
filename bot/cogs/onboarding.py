@@ -343,7 +343,7 @@ class Onboarding(commands.Cog):
             await self.process_apply_thread(message.channel)
 
 
-    onboard_group = app_commands.Group(name="onboard", description="Hệ thống Bot Thư Ký duyệt đơn")
+    onboard_group = app_commands.Group(name="recuibot", description="Hệ thống Bot Thư Ký duyệt đơn")
 
     @onboard_group.command(name="toggle", description="Bật/Tắt chế độ Thư Ký tự động")
     async def onboard_toggle(self, interaction: discord.Interaction):

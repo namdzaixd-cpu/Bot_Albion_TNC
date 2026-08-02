@@ -69,9 +69,10 @@ FEATURE_FIELDS = [
     ),
     (
         "👋 Onboarding",
-        "`/onboard setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
-        "`/onboard set_apply_channel` (chọn kênh apply — Officer)\n"
-        "`/onboard toggle` (bật/tắt tính năng Onboarding — Officer)",
+        "`/recuibot setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
+        "`/recuibot set_apply_channel` (chọn kênh apply — Officer)\n"
+        "`/recuibot setup_roles` (cài đặt role — Officer)\n"
+        "`/recuibot toggle` (bật/tắt tính năng Onboarding — Officer)",
     ),
 ]
 
