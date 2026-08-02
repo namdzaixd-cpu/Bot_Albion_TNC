@@ -14,8 +14,8 @@ except ImportError:
 
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 
-url_input = input("Nhập URL Ollama (Mặc định: http://localhost:11434): ").strip()
-ollama_url = url_input if url_input else "http://localhost:11434"
+# URL Ollama cố định, không cần nhập lại
+ollama_url = "https://ollama.com/api"
 
 model_input = input("Nhập tên model Ollama (Mặc định: llama3): ").strip()
 model = model_input if model_input else "llama3"
