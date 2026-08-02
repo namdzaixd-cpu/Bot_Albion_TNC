@@ -30,6 +30,10 @@ chưa có không.
   tự ý resolve — báo rõ cho user biết file nào xung đột, xung đột với commit nào, và chờ user
   quyết định cách xử lý.
 
+Sau khi push xong: kiểm tra xem máy local của user có đang chạy tiến trình bot thật không (vd
+`ps aux | grep "bot/main.py"`), nếu có thì `kill` luôn tiến trình đó — tránh trường hợp bot chạy
+song song cả ở local lẫn Render (xung đột Discord gateway, xung đột auto-sync Storage lên GitHub).
+
 ## Nguyên tắc code (Karpathy guidelines)
 
 Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
