@@ -44,6 +44,8 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 - Luôn check syntax (`python -m py_compile ...`) trước khi báo hoàn thành một thay đổi Python.
 - Sau khi thêm tính năng mới hoặc fix bug trong `bot/`: cập nhật lại danh sách lệnh (bảng tính
   năng) trong README.md nếu danh sách slash/prefix command thay đổi.
+- Khi tạo commit: KHÔNG thêm dòng `Co-Authored-By: Claude ...` vào commit message — user muốn
+  GitHub chỉ hiển thị mình họ là tác giả, không hiện đồng tác giả "claude".
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
   permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
