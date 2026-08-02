@@ -46,6 +46,21 @@ while True:
     if not question:
         continue
 
+    # Nhận diện lệnh đổi model
+    if question.lower() == "/model":
+        print("\nChọn model Ollama mới:")
+        print("1. minimax-m3")
+        print("2. gpt-oss:120b")
+        model_input = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
+        if model_input == "2":
+            model = "gpt-oss:120b"
+        elif model_input == "1" or not model_input:
+            model = "minimax-m3"
+        else:
+            model = model_input
+        print(f"🔄 Đã chuyển sang model: {model}\n")
+        continue
+
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": question}],
