@@ -2,10 +2,6 @@
 
 Xem [README.md](README.md) để biết tổng quan dự án, stack và cấu trúc code.
 
-> Lưu ý: `instruction.md` ở root là custom instructions cho **Claude.ai chat/Projects** (workflow
-> upload file, paste code vào Replit Shell) — không áp dụng cho Claude Code. File này (`CLAUDE.md`)
-> mới là instructions cho Claude Code.
-
 ## Quy trình làm việc — QUAN TRỌNG NHẤT
 
 Khi user đề xuất tính năng mới hoặc sửa đổi code: **bàn thiết kế trước** (mô tả lệnh, logic, ảnh
@@ -21,6 +17,10 @@ Nếu không chắc user đã chốt hay chưa, hỏi lại "Chốt chưa?" và 
 
 Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh giá, tìm bug mà không sửa) không cần qua
 gate này — chỉ áp dụng cho việc *viết/sửa* code.
+
+Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` luôn, không cần hỏi lại
+"commit đi?" — user đã cấp quyền chuẩn. Riêng `git push` lên remote thì vẫn phải hỏi xác nhận
+trước như bình thường (ảnh hưởng shared state, rủi ro cao hơn commit local).
 
 ## Nguyên tắc code (Karpathy guidelines)
 
@@ -43,7 +43,10 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 - Code ngắn gọn, đủ tính năng, không dài dòng thừa.
 - Luôn check syntax (`python -m py_compile ...`) trước khi báo hoàn thành một thay đổi Python.
 - Sau khi thêm tính năng mới hoặc fix bug trong `bot/`: cập nhật lại danh sách lệnh (bảng tính
-  năng) trong README.md nếu danh sách slash/prefix command thay đổi.
+  năng) trong README.md, và cập nhật `FEATURE_FIELDS` trong `bot/cogs/about.py` (bảng lệnh hiện
+  trong `/aboutme`) nếu danh sách slash/prefix command thay đổi.
+- Commit message do AI tạo (`git commit`) phải viết 100% bằng tiếng Việt (vd `sửa_lỗi(ai): ...`
+  thay vì `fix(ai): ...`), khớp style hiện có trong git log.
 - Khi tạo commit: KHÔNG thêm dòng `Co-Authored-By: Claude ...` vào commit message — user muốn
   GitHub chỉ hiển thị mình họ là tác giả, không hiện đồng tác giả "claude".
 - TUYỆT ĐỐI KHÔNG chạy lệnh khởi động bot thật trên máy local của user (vd `python bot/main.py`,
