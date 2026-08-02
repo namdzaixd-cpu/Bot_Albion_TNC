@@ -276,7 +276,7 @@ class CoreBankCog(commands.Cog):
             return  # Đã cộng rồi, Officer khác react sau → bỏ qua
 
         # Lấy tin nhắn gốc để tìm ra member đã đăng ảnh
-        channel = guild.get_channel(payload.channel_id)
+        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
         if not channel:
             return
         try:
@@ -419,7 +419,7 @@ class CoreBankCog(commands.Cog):
             except Exception:
                 pass
 
-        channel = guild.get_channel(payload.channel_id)
+        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
         if channel:
             try:
                 message = await channel.fetch_message(payload.message_id)
