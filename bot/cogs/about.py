@@ -56,10 +56,7 @@ FEATURE_FIELDS = [
     ),
     (
         "🧠 Quản lý AI",
-        "`/aimodel view` (xem model)\n"
-        "`/aimodel set` (đổi model — Officer)\n"
-        "`/aimodel add` (thêm model — Officer)\n"
-        "`/aimodel remove` (xóa model — Officer)\n"
+        "Bot tự động xoay vòng qua Ollama/Gemini/OpenRouter khi 1 bên lỗi, không cần đổi model thủ công\n"
         "`/aimodel balance` (xem số dư Credit)\n"
         "`/aichat buffer` (chỉnh bộ nhớ đệm — Officer)\n"
         "`/aichat intercept` (bật/tắt nói leo — Officer)\n"
