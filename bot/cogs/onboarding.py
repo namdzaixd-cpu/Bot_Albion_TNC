@@ -291,11 +291,19 @@ class Onboarding(commands.Cog):
                 
             embed = discord.Embed(title=f"Báo cáo tự động: {api_data.get('Name')}", color=discord.Color.blue())
             
-            fame_total = api_data.get('LifetimeStatistics', {}).get('PvE', {}).get('Total', 0)
+            stats = api_data.get('LifetimeStatistics', {})
+            pve_fame = stats.get('PvE', {}).get('Total', 0)
+            gathering_fame = stats.get('Gathering', {}).get('All', {}).get('Total', 0)
+            crafting_fame = stats.get('Crafting', {}).get('Total', 0)
+            fishing_fame = stats.get('FishingFame', 0)
+            farming_fame = stats.get('FarmingFame', 0)
             kill_fame = api_data.get('KillFame', 0)
             death_fame = api_data.get('DeathFame', 0)
             
-            embed.add_field(name="PvE Fame", value=f"{fame_total:,}", inline=True)
+            total_fame = pve_fame + gathering_fame + crafting_fame + fishing_fame + farming_fame + kill_fame
+            
+            embed.add_field(name="Total Fame", value=f"{total_fame:,}", inline=True)
+            embed.add_field(name="PvE Fame", value=f"{pve_fame:,}", inline=True)
             embed.add_field(name="Kill Fame", value=f"{kill_fame:,}", inline=True)
             embed.add_field(name="Death Fame", value=f"{death_fame:,}", inline=True)
             
