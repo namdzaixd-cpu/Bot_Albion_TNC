@@ -16,7 +16,7 @@ thông tin, hỏi ngược lại.
 Nếu không chắc user đã chốt hay chưa, hỏi lại "Chốt chưa?" và chờ — tuyệt đối không tự ý code.
 
 Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh giá, tìm bug mà không sửa) không cần qua
-gate này — chỉ áp dụng cho việc *viết/sửa* code.
+gate này — chỉ áp dụng cho việc _viết/sửa_ code.
 
 Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` luôn, không cần hỏi lại
 "commit đi?" — user đã cấp quyền chuẩn.
@@ -24,6 +24,7 @@ Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` l
 Trước khi `git push`: đây là dự án dùng chung (có thể có người khác đã push thay đổi lên GitHub),
 nên BẮT BUỘC `git fetch` rồi kiểm tra xem remote (`origin/<branch>`) có commit mới nào mà local
 chưa có không.
+
 - Nếu remote không có gì mới, hoặc có commit mới nhưng merge/rebase sạch không xung đột: push
   luôn, không cần hỏi lại.
 - Nếu phát hiện xung đột (cùng sửa 1 đoạn code, hoặc merge/rebase báo conflict): DỪNG LẠI, KHÔNG
@@ -77,11 +78,13 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có thay đổi (xem `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`).
 
 ### ⛔ TUYỆT ĐỐI KHÔNG được phép:
+
 - Xóa, ghi đè, hay sửa thẳng file JSON trong `bot/Storage/` — dù chỉ để test hay debug.
 - Đọc/ghi file trong thư mục này bằng `open()` thuần — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
 - Đặt file tạm, file test, file log vào đây — các file không phải dữ liệu kho sẽ làm ô nhiễm GitHub sync.
 
 ### ✅ Quy tắc khi thêm dữ liệu mới:
+
 1. File JSON mới **phải** đặt vào `bot/Storage/`.
 2. Import `STORAGE_DIR` từ `bot/core/config.py`, khai báo đường dẫn bằng `os.path.join(STORAGE_DIR, "tên_file.json")`.
 3. Đặt tên file theo pattern: `tnc_<tính_năng>_v<số_version>.json`
@@ -119,4 +122,4 @@ Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có
 
 ## Ngôn ngữ & xưng hô
 
-Giao tiếp bằng tiếng Việt, xưng tui/bro.
+Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi
