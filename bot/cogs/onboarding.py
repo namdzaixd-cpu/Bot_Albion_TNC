@@ -331,7 +331,6 @@ class Onboarding(commands.Cog):
 
     @onboard_group.command(name="setup_channels", description="Cài đặt các kênh cần thiết để bot tag trong lời chào")
     async def onboard_setup_channels(self, interaction: discord.Interaction, 
-                                     apply: discord.abc.GuildChannel,
                                      rules: discord.abc.GuildChannel,
                                      guild_chat: discord.abc.GuildChannel,
                                      question: discord.abc.GuildChannel):
@@ -339,12 +338,11 @@ class Onboarding(commands.Cog):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
         
-        self.config.data["apply_channel_id"] = str(apply.id)
         self.config.data["rules_channel_id"] = str(rules.id)
         self.config.data["chat_channel_id"] = str(guild_chat.id)
         self.config.data["question_channel_id"] = str(question.id)
         self.config.save()
-        await interaction.response.send_message("✅ Đã lưu cấu hình 4 kênh thành công!", ephemeral=True)
+        await interaction.response.send_message("✅ Đã lưu cấu hình 3 kênh thành công!", ephemeral=True)
 
     @onboard_group.command(name="setup_roles", description="Cài đặt Role Officer và Role Member")
     async def onboard_setup_roles(self, interaction: discord.Interaction, 
