@@ -6,6 +6,9 @@ import random
 import asyncio
 import base64
 import io
+import ipaddress
+import socket
+from urllib.parse import urlparse
 try:
     from duckduckgo_search import DDGS
 except ImportError:
@@ -20,6 +23,19 @@ from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def _is_public_url(url: str) -> bool:
+    """Chặn SSRF: chỉ cho fetch URL http/https trỏ tới IP public (không private/loopback/link-local)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        ip = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
+    except Exception:
+        return False
+
 
 class ChatAI(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -44,7 +60,7 @@ class ChatAI(commands.Cog):
         if "autowiki_channels" not in self.ai_config:
             self.ai_config["autowiki_channels"] = []
             
-        self.library_file = os.path.join(DATA_DIR, "tnc_library_v1.json")
+        self.library_file = os.path.join(STORAGE_DIR, "tnc_library_v1.json")
         self.library_data = load_json(self.library_file, list)
         
         self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
@@ -556,6 +572,8 @@ class ChatAI(commands.Cog):
         )
 
     async def _fetch_url_content(self, url: str) -> str:
+        if not await asyncio.to_thread(_is_public_url, url):
+            return "[Link này trỏ tới địa chỉ nội bộ hoặc không hợp lệ, bot từ chối truy cập để đảm bảo an toàn.]"
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -828,9 +846,6 @@ class ChatAI(commands.Cog):
             
         if is_random_intercept:
             prompt += "\n\n[HỆ THỐNG]: Bạn đang tự động nhảy vào nói leo (không ai gọi bạn). HÃY TRẢ LỜI CỰC KỲ NGẮN GỌN (1-2 CÂU), MANG TÍNH CHẤT GÓP VUI, TẤU HÀI HOẶC CÀ KHỊA CHÚT ĐỈNH. TUYỆT ĐỐI KHÔNG DÀI DÒNG HAY GIÁO HUẤN."
-            
-        with open("debug_prompt.txt", "w", encoding="utf-8") as f:
-            f.write(prompt)
             
         gemini_parts = [{"text": prompt}]
         or_content = [{"type": "text", "text": prompt}]

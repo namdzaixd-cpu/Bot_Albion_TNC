@@ -189,7 +189,7 @@ class Onboarding(commands.Cog):
                 async with session.get(f"https://gameinfo.albiononline.com/api/gameinfo/players/{player_id}") as resp:
                     if resp.status != 200: return None
                     return await resp.json()
-        except:
+        except Exception:
             return None
 
     def validate_form(self, content: str):

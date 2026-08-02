@@ -8,14 +8,14 @@ from discord import app_commands
 from discord.ext import commands
 from gtts import gTTS
 
-from core.config import DATA_DIR
+from core.config import DATA_DIR, STORAGE_DIR
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 # ==============================================================================
 # HỆ THỐNG TTS VOICE "ALO" (Bot join voice, đọc chat bằng giọng Google TTS)
 # ==============================================================================
-TTS_CONFIG_FILE = os.path.join(DATA_DIR, "tnc_tts_config_v1.json")
+TTS_CONFIG_FILE = os.path.join(STORAGE_DIR, "tnc_tts_config_v1.json")
 
 MENTION_RE = re.compile(r"<@!?(\d+)>")
 CHANNEL_MENTION_RE = re.compile(r"<#(\d+)>")
