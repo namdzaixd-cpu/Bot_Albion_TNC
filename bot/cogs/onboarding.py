@@ -70,23 +70,6 @@ class OfficerApprovalView(discord.ui.View):
         guild = interaction.guild
         member = guild.get_member(self.target_user_id)
         if member:
-            formatted_yob = self.yob
-            if formatted_yob.isdigit():
-                if len(formatted_yob) == 4:
-                    if formatted_yob.startswith("20"):
-                        formatted_yob = f"2k{formatted_yob[3:]}" if formatted_yob[3:] != "0" else "2k"
-                    elif formatted_yob.startswith("19"):
-                        formatted_yob = formatted_yob[2:]
-            
-            new_nick = f"[TNC] {self.ign_name} {formatted_yob}".strip()
-            if len(new_nick) > 32:
-                new_nick = new_nick[:32]
-                
-            try:
-                await member.edit(nick=new_nick)
-            except discord.Forbidden:
-                pass
-                
             role_id = self.cog.config.member_role_id
             if role_id:
                 role = guild.get_role(int(role_id))
@@ -97,7 +80,8 @@ class OfficerApprovalView(discord.ui.View):
                         pass
         
         for child in self.children:
-            child.disabled = True
+            if child.custom_id in ["onboard_approve", "onboard_reject"]:
+                child.disabled = True
             
         embed = interaction.message.embeds[0]
         embed.color = discord.Color.green()
@@ -110,7 +94,7 @@ class OfficerApprovalView(discord.ui.View):
         c_question = f"<#{self.cog.config.question_channel_id}>" if self.cog.config.question_channel_id else "Kênh Hỏi đáp"
         
         welcome_msg = (
-            f"🎉 Chào mừng <@{self.target_user_id}> đã gia nhập TNC! (Bot đã tự động đổi tên Discord giúp bạn).\n\n"
+            f"🎉 Chào mừng <@{self.target_user_id}> đã gia nhập TNC!\n\n"
             f"🔹 Hãy đọc thật kỹ {c_rules} để nắm rõ các quy định và văn hóa hoạt động của guild.\n"
             f"🔹 Ghé qua {c_chat} để đàm đạo, chém gió và giao lưu cùng anh em.\n"
             f"🔹 Bất cứ khi nào có thắc mắc hay cần hỗ trợ gì về game, bro cứ hét thẳng vào {c_question} nhé, mọi người sẽ giải đáp nhiệt tình.\n\n"
@@ -118,6 +102,40 @@ class OfficerApprovalView(discord.ui.View):
             f"Chúc bro chơi game vui vẻ ❤️"
         )
         await interaction.channel.send(welcome_msg)
+
+    @discord.ui.button(label="Đổi tên new member", style=discord.ButtonStyle.primary, custom_id="onboard_rename")
+    async def rename_member(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Xin lỗi, chỉ Officer trở lên mới được dùng!", ephemeral=True)
+            return
+            
+        guild = interaction.guild
+        member = guild.get_member(self.target_user_id)
+        if not member:
+            await interaction.response.send_message("❌ Không tìm thấy user này trong server (có thể họ đã out).", ephemeral=True)
+            return
+            
+        formatted_yob = self.yob
+        if formatted_yob.isdigit():
+            if len(formatted_yob) == 4:
+                if formatted_yob.startswith("20"):
+                    formatted_yob = f"2k{formatted_yob[3:]}" if formatted_yob[3:] != "0" else "2k"
+                elif formatted_yob.startswith("19"):
+                    formatted_yob = formatted_yob[2:]
+        
+        new_nick = f"[TNC] {self.ign_name} {formatted_yob}".strip()
+        if len(new_nick) > 32:
+            new_nick = new_nick[:32]
+            
+        try:
+            await member.edit(nick=new_nick)
+            button.disabled = True
+            await interaction.response.edit_message(view=self)
+            await interaction.followup.send(f"✅ Đã tự động đổi tên thành `{new_nick}`!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ Lỗi quyền: Bot không có quyền đổi tên user này (có thể role của họ cao hơn bot hoặc bot chưa có quyền Manage Nicknames).", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Có lỗi xảy ra: {e}", ephemeral=True)
 
     @discord.ui.button(label="Từ chối", style=discord.ButtonStyle.red, custom_id="onboard_reject")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
