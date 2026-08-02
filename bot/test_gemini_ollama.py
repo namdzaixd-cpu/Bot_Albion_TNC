@@ -1,6 +1,7 @@
 """Script test API + model cho Gemini và Ollama — chạy: python bot/test_gemini_ollama.py"""
 import json
 import os
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -73,7 +74,8 @@ while True:
     start = time.perf_counter()
     
     try:
-        with urllib.request.urlopen(req) as resp:
+        ssl_context = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, context=ssl_context) as resp:
             result = json.loads(resp.read().decode("utf-8"))
         elapsed = time.perf_counter() - start
         
