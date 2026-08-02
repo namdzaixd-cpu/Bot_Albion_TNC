@@ -17,17 +17,21 @@ OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 # URL Ollama cố định, không cần nhập lại
 ollama_url = "https://ollama.com/api"
 
-print("Chọn model Ollama:")
-print("1. minimax-m3")
-print("2. gpt-oss:120b")
-model_input = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
+def choose_model():
+    print("Chọn model Ollama:")
+    print("1. minimax-m3")
+    print("2. gpt-oss:120b")
+    model_choice = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
+    
+    if model_choice == "2":
+        return "gpt-oss:120b"
+    elif model_choice == "1" or not model_choice:
+        return "minimax-m3"
+    else:
+        return model_choice
 
-if model_input == "2":
-    model = "gpt-oss:120b"
-elif model_input == "1" or not model_input:
-    model = "minimax-m3"
-else:
-    model = model_input
+# Khởi tạo model lần đầu
+model = choose_model()
 
 # Chuẩn hóa URL để tránh trùng lặp cụm /api/chat hoặc /api
 url_clean = ollama_url.rstrip('/')
@@ -48,16 +52,8 @@ while True:
 
     # Nhận diện lệnh đổi model
     if question.lower() == "/model":
-        print("\nChọn model Ollama mới:")
-        print("1. minimax-m3")
-        print("2. gpt-oss:120b")
-        model_input = input("Lựa chọn (1 hoặc 2, Mặc định: 1): ").strip()
-        if model_input == "2":
-            model = "gpt-oss:120b"
-        elif model_input == "1" or not model_input:
-            model = "minimax-m3"
-        else:
-            model = model_input
+        print()
+        model = choose_model()
         print(f"🔄 Đã chuyển sang model: {model}\n")
         continue
 
@@ -82,7 +78,19 @@ while True:
         print(f"\n[{elapsed:.2f}s] {reply}\n")
     except urllib.error.HTTPError as e:
         elapsed = time.perf_counter() - start
-        print(f"\n[{elapsed:.2f}s] Lỗi HTTP {e.code}: {e.read().decode('utf-8')}\n")
+        error_content = e.read().decode('utf-8')
+        print(f"\n[{elapsed:.2f}s] Lỗi HTTP {e.code}: {error_content}")
+        if e.code == 401:
+            print("❌ [LỖI 1]: Truy cập bị từ chối (Lỗi 401).")
+            print("👉 Hướng dẫn: Nếu bạn dùng Ollama qua proxy/cloud, vui lòng kiểm tra lại OLLAMA_API_KEY trong file .env!\n")
+        elif e.code == 429:
+            print("❌ [LỖI 2]: Đã chạm giới hạn request/ngày của API Proxy (Lỗi 429).")
+            print("👉 Hướng dẫn: Vui lòng đổi sang API Key khác hoặc dùng Ollama cục bộ!\n")
+        elif e.code == 404:
+            print("❌ [LỖI 2]: Model hoặc đường dẫn không tồn tại trên server Ollama (Lỗi 404).")
+            print("👉 Hướng dẫn: Hãy kiểm tra xem bạn đã pull model này (`ollama pull <model>`) về máy chưa!\n")
+        else:
+            print("👉 Hướng dẫn: Kiểm tra xem URL hoặc model Ollama có chính xác không.\n")
     except Exception as e:
         elapsed = time.perf_counter() - start
         print(f"\n[{elapsed:.2f}s] Lỗi kết nối: {str(e)}\n")

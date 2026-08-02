@@ -10,7 +10,9 @@ import urllib.request
 from core.config import GEMINI_API_KEY
 
 if not GEMINI_API_KEY:
-    raise SystemExit("Thiếu GEMINI_API_KEY trong file .env")
+    print("\n❌ [LỖI 1]: Không tìm thấy GEMINI_API_KEY trong file .env.")
+    print("👉 Hướng dẫn: Sao chép file .env.example thành .env ở thư mục gốc và điền giá trị cho GEMINI_API_KEY.\n")
+    raise SystemExit(1)
 
 def choose_model():
     print("Chọn model Gemini:")
@@ -68,7 +70,19 @@ while True:
         print(f"\n[{elapsed:.2f}s] {reply}\n")
     except urllib.error.HTTPError as e:
         elapsed = time.perf_counter() - start
-        print(f"\n[{elapsed:.2f}s] Lỗi HTTP {e.code}: {e.read().decode('utf-8')}\n")
+        error_content = e.read().decode('utf-8')
+        print(f"\n[{elapsed:.2f}s] Lỗi HTTP {e.code}: {error_content}")
+        if e.code == 429:
+            print("❌ [LỖI 2]: Đã chạm giới hạn request/ngày hoặc tần suất của API (Rate Limit / Quota Exceeded).")
+            print("👉 Hướng dẫn: API Key này đã hết lượt dùng hôm nay. Vui lòng đổi sang API Key khác trong file .env!\n")
+        elif e.code in (401, 403):
+            print("❌ [LỖI 1/2]: API Key không hợp lệ hoặc không có quyền truy cập.")
+            print("👉 Hướng dẫn: Vui lòng kiểm tra lại giá trị GEMINI_API_KEY trong file .env!\n")
+        elif e.code in (400, 404):
+            print("❌ [LỖI 2]: Model không tồn tại hoặc không còn khả dụng trên Google AI Studio.")
+            print("👉 Hướng dẫn: Vui lòng kiểm tra lại tên model Google hỗ trợ hoặc đổi model khác.\n")
+        else:
+            print("👉 Hướng dẫn: Kiểm tra lại cấu hình hoặc tên model xem có chính xác không.\n")
     except Exception as e:
         elapsed = time.perf_counter() - start
         print(f"\n[{elapsed:.2f}s] Lỗi kết nối: {str(e)}\n")
