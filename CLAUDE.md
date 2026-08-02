@@ -46,6 +46,11 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
   năng) trong README.md nếu danh sách slash/prefix command thay đổi.
 - Khi tạo commit: KHÔNG thêm dòng `Co-Authored-By: Claude ...` vào commit message — user muốn
   GitHub chỉ hiển thị mình họ là tác giả, không hiện đồng tác giả "claude".
+- TUYỆT ĐỐI KHÔNG chạy lệnh khởi động bot thật trên máy local của user (vd `python bot/main.py`,
+  `python main.py`) — bot đang chạy 24/7 trên Render (production), chạy thêm 1 bản ở local sẽ
+  khiến bot bị "chạy trùng" ở 2 nơi cùng lúc (xung đột kết nối Discord gateway, xung đột auto-sync
+  Storage lên GitHub). Chỉ chạy các script test độc lập (vd `test_api_key/*.py`, `py_compile`,
+  test suite trong `bot/tests/`) — không chạy chính bot.
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
   permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
