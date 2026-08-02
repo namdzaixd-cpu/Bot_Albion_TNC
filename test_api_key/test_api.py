@@ -102,6 +102,13 @@ def get_api_setup(provider, model):
         return url, headers
         
     else:
+        # Kiểm tra điều kiện chặn phí cho OpenRouter (bắt buộc phải có :free hoặc /free)
+        if not (model.endswith(":free") or model.endswith("/free")):
+            print("\n❌ [CẢNH BÁO BẢO VỆ CHI PHÍ]:")
+            print(f"Yêu cầu gọi model '{model}' qua OpenRouter đã bị chặn vì không có hậu tố ':free' hoặc '/free'.")
+            print("Vui lòng chỉ sử dụng các model miễn phí để tránh phát sinh chi phí ngoài ý muốn!\n")
+            raise SystemExit(1)
+
         if not OPENROUTER_API_KEY:
             print("\n❌ [LỖI 1]: Không tìm thấy OPENROUTER_API_KEY trong file .env.")
             print("👉 Hướng dẫn: Thêm OPENROUTER_API_KEY vào file .env ở thư mục gốc.\n")
