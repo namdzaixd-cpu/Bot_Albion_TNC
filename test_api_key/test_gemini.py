@@ -2,9 +2,14 @@
 import json
 import os
 import ssl
+import sys
 import time
 import urllib.error
 import urllib.request
+
+# Thêm đường dẫn để import được core.config khi chạy từ thư mục khác
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bot"))
 
 # Load cấu hình từ bot
 from core.config import GEMINI_API_KEY
