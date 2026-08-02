@@ -198,83 +198,101 @@ class Onboarding(commands.Cog):
         return count >= 4  
 
     async def process_apply_thread(self, thread: discord.Thread, msg: discord.Message = None):
-        if not msg:
-            async for m in thread.history(limit=5, oldest_first=True):
-                if m.author.id == thread.owner_id:
-                    msg = m
-                    break
-        if not msg:
-            return
+        try:
+            if not msg:
+                try:
+                    async for m in thread.history(limit=5, oldest_first=True):
+                        if m.author.id == thread.owner_id:
+                            msg = m
+                            break
+                except discord.Forbidden:
+                    print(f"❌ LỖI QUYỀN: Bot không có quyền 'Đọc Lịch sử Tin nhắn' trong kênh {thread.parent.name}")
+                    return
+                    
+            if not msg:
+                return
+                
+            content = msg.content
             
-        content = msg.content
-        
-        ign_match = re.search(r'Ingame\s*[:\-]?\s*([a-zA-Z0-9_]+)', content, re.IGNORECASE)
-        yob_match = re.search(r'Năm sinh\s*[:\-]?\s*([a-zA-Z0-9]+)', content, re.IGNORECASE)
-        
-        if not ign_match:
-            if not self.validate_form(content): return 
-            await thread.send("⚠️ Bot không tìm thấy mục `Ingame:` trong đơn. Hãy viết rõ form `Ingame : Tên` nhé!")
-            return
+            ign_match = re.search(r'Ingame\s*[:\-]?\s*([a-zA-Z0-9_]+)', content, re.IGNORECASE)
+            yob_match = re.search(r'Năm sinh\s*[:\-]?\s*([a-zA-Z0-9]+)', content, re.IGNORECASE)
             
-        if not self.validate_form(content):
-            await thread.send("⚠️ Bro điền thiếu form rồi kìa, hãy điền đầy đủ form mẫu nhé!")
-            return
-            
-        has_image = False
-        if msg.attachments:
-            for att in msg.attachments:
-                if att.content_type and att.content_type.startswith("image/"):
-                    has_image = True
-                    break
-        if "http" in content.lower() and ("png" in content.lower() or "jpg" in content.lower() or "jpeg" in content.lower() or "discord" in content.lower()):
-            has_image = True
-            
-        if not has_image:
-            async for m in thread.history(limit=10, oldest_first=True):
-                if m.author.id == thread.owner_id and (m.attachments or "http" in m.content):
-                    has_image = True
-                    break
+            if not ign_match:
+                if not self.validate_form(content): return 
+                await thread.send("⚠️ Bot không tìm thấy mục `Ingame:` trong đơn. Hãy viết rõ form `Ingame : Tên` nhé!")
+                return
+                
+            if not self.validate_form(content):
+                await thread.send("⚠️ Bro điền thiếu form rồi kìa, hãy điền đầy đủ form mẫu nhé!")
+                return
+                
+            has_image = False
+            if msg.attachments:
+                for att in msg.attachments:
+                    if att.content_type and att.content_type.startswith("image/"):
+                        has_image = True
+                        break
+            if "http" in content.lower() and ("png" in content.lower() or "jpg" in content.lower() or "jpeg" in content.lower() or "discord" in content.lower()):
+                has_image = True
+                
+            if not has_image:
+                try:
+                    async for m in thread.history(limit=10, oldest_first=True):
+                        if m.author.id == thread.owner_id and (m.attachments or "http" in m.content):
+                            has_image = True
+                            break
+                except discord.Forbidden:
+                    print(f"❌ LỖI QUYỀN: Bot không có quyền 'Đọc Lịch sử Tin nhắn' trong kênh {thread.parent.name}")
+                    return
+    
+            if not has_image:
+                # Check if bot already asked for image to prevent spamming
+                already_asked = False
+                try:
+                    async for m in thread.history(limit=10, oldest_first=True):
+                        if m.author == self.bot.user and "xin thêm ảnh stat" in m.content.lower():
+                            already_asked = True
+                            break
+                except discord.Forbidden:
+                    pass
+                
+                if not already_asked:
+                    try:
+                        await thread.send("Bro ơi cho tui xin thêm ảnh stat ingame nhé.")
+                    except discord.Forbidden:
+                        print(f"❌ LỖI QUYỀN: Bot không có quyền 'Gửi Tin nhắn trong Chuỗi' ở kênh {thread.parent.name}")
+                return
+                
+            ign = ign_match.group(1).strip()
+            yob = yob_match.group(1).strip() if yob_match else ""
 
-        if not has_image:
-            # Check if bot already asked for image to prevent spamming
-            already_asked = False
-            async for m in thread.history(limit=10, oldest_first=True):
-                if m.author == self.bot.user and "xin thêm ảnh stat" in m.content.lower():
-                    already_asked = True
-                    break
+            api_data = await self.fetch_albion_player(ign)
+            if not api_data:
+                await thread.send(f"❌ Không tìm thấy nhân vật `{ign}` trên hệ thống Albion. Officer vui lòng kiểm tra thủ công.")
+                return
+                
+            embed = discord.Embed(title=f"Báo cáo tự động: {api_data.get('Name')}", color=discord.Color.blue())
             
-            if not already_asked:
-                await thread.send("Bro ơi cho tui xin thêm ảnh stat ingame nhé.")
-            return
+            fame_total = api_data.get('LifetimeStatistics', {}).get('PvE', {}).get('Total', 0)
+            kill_fame = api_data.get('KillFame', 0)
+            death_fame = api_data.get('DeathFame', 0)
             
-        ign = ign_match.group(1).strip()
-        yob = yob_match.group(1).strip() if yob_match else ""
-        
-        api_data = await self.fetch_albion_player(ign)
-        if not api_data:
-            await thread.send(f"❌ Không tìm thấy nhân vật `{ign}` trên hệ thống Albion. Officer vui lòng kiểm tra thủ công.")
-            return
+            embed.add_field(name="PvE Fame", value=f"{fame_total:,}", inline=True)
+            embed.add_field(name="Kill Fame", value=f"{kill_fame:,}", inline=True)
+            embed.add_field(name="Death Fame", value=f"{death_fame:,}", inline=True)
             
-        embed = discord.Embed(title=f"Báo cáo tự động: {api_data.get('Name')}", color=discord.Color.blue())
-        
-        fame_total = api_data.get('LifetimeStatistics', {}).get('PvE', {}).get('Total', 0)
-        kill_fame = api_data.get('KillFame', 0)
-        death_fame = api_data.get('DeathFame', 0)
-        
-        embed.add_field(name="PvE Fame", value=f"{fame_total:,}", inline=True)
-        embed.add_field(name="Kill Fame", value=f"{kill_fame:,}", inline=True)
-        embed.add_field(name="Death Fame", value=f"{death_fame:,}", inline=True)
-        
-        old_guild = api_data.get('GuildName', 'Không có')
-        embed.add_field(name="Guild Hiện Tại / Cũ", value=old_guild, inline=False)
-        
-        view = ApplicantConfirmView(self, thread.owner_id, api_data.get('Name'), yob, embed)
-        
-        msg_text = (
-            f"👉 **<@{thread.owner_id}>: Vui lòng nộp đơn (apply) vào guild `The Northern Constellations` trong game.**\n"
-            f"Sau khi nộp xong ingame, hãy bấm nút **Đã gửi apply ingame** bên dưới để gọi Officer vào duyệt nhé!"
-        )
-        await thread.send(content=msg_text, embed=embed, view=view)
+            old_guild = api_data.get('GuildName', 'Không có')
+            embed.add_field(name="Guild Hiện Tại / Cũ", value=old_guild, inline=False)
+            
+            view = ApplicantConfirmView(self, thread.owner_id, api_data.get('Name'), yob, embed)
+            
+            msg_text = (
+                f"👉 **<@{thread.owner_id}>: Vui lòng nộp đơn (apply) vào guild `The Northern Constellations` trong game.**\n"
+                f"Sau khi nộp xong ingame, hãy bấm nút **Đã gửi apply ingame** bên dưới để gọi Officer vào duyệt nhé!"
+            )
+            await thread.send(content=msg_text, embed=embed, view=view)
+        except Exception as e:
+            print(f"❌ LỖI Onboarding: {e}")
 
 
     @commands.Cog.listener()
@@ -297,11 +315,15 @@ class Onboarding(commands.Cog):
         if not apply_ch or str(message.channel.parent_id) != str(apply_ch):
             return
             
+        print(f"DEBUG Onboarding: Nhận tin nhắn trong kênh apply {message.channel.name}")
+        
         if message.author.id != message.channel.owner_id:
+            print("DEBUG Onboarding: Người gửi không phải chủ thread, bỏ qua.")
             return
             
         # Nếu đây là tin nhắn gốc (starter message) của Thread, xử lý luôn
         if message.id == message.channel.id:
+            print("DEBUG Onboarding: Tin nhắn gốc của Forum, xử lý process_apply_thread.")
             await self.process_apply_thread(message.channel, msg=message)
             return
             
