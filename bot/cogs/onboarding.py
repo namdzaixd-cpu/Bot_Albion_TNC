@@ -331,9 +331,9 @@ class Onboarding(commands.Cog):
 
     @onboard_group.command(name="setup_channels", description="Cài đặt các kênh cần thiết để bot tag trong lời chào")
     async def onboard_setup_channels(self, interaction: discord.Interaction, 
-                                     rules: discord.abc.GuildChannel,
-                                     guild_chat: discord.abc.GuildChannel,
-                                     question: discord.abc.GuildChannel):
+                                     rules: discord.TextChannel,
+                                     guild_chat: discord.TextChannel,
+                                     question: discord.TextChannel):
         if not is_officer(interaction.user):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
             return
