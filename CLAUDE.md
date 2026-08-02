@@ -123,7 +123,7 @@ Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có
 # Project-Scoped Rules
 
 ## Quy tắc lưu trữ Rules/Yêu cầu mới
-Khi có yêu cầu mới, rule mới hoặc chỉ dẫn từ người dùng (User Rules/Instructions), thay vì ghi vào file `.agents/AGENTS.md`, hãy ghi trực tiếp vào file [CLAUDE.md](file:///d:/Documents/CODE/Bot_Albion_TNC/CLAUDE.md).
+Khi có yêu cầu mới, rule mới hoặc chỉ dẫn từ người dùng (User Rules/Instructions), thay vì ghi vào file `.agents/AGENTS.md`, hãy ghi trực tiếp vào file [CLAUDE.md](file:/Bot_Albion_TNC/CLAUDE.md).
 
 ## Feature Documentation
 Từ nay khi user mô tả tính năng mới trong quá trình phát triển, BẮT BUỘC phải tự động lưu mô tả cơ chế hoạt động và chi tiết cách hoạt động của tính năng đó vào một file riêng (vd: `docs/features.md` hoặc một markdown file tương ứng). 
