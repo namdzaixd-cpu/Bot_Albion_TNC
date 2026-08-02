@@ -8,6 +8,7 @@ import base64
 import io
 import ipaddress
 import socket
+import time
 from urllib.parse import urlparse
 try:
     from duckduckgo_search import DDGS
@@ -18,11 +19,26 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL
+from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OLLAMA_API_KEY
 from core.permissions import is_officer
 from core.storage import load_json, save_json
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OLLAMA_URL = "https://ollama.com/api/chat"
+
+# Chuỗi dự phòng tự động: bot thử lần lượt từng bước, bước nào lỗi thì chuyển bước kế tiếp.
+FAILOVER_CHAIN = [
+    {"provider": "ollama", "model": "minimax-m3"},
+    {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
+    {"provider": "openrouter", "model": "nvidia/nemotron-3-ultra-550b-a55b:free"},
+    {"provider": "gemini", "model": "gemini-3.1-flash-lite"},
+    {"provider": "openrouter", "model": "inclusionai/ling-3.0-flash:free"},
+    {"provider": "gemini", "model": "gemini-2.5-flash"},
+    {"provider": "ollama", "model": "gpt-oss:120b"},
+    {"provider": "openrouter", "model": "openrouter/free"},
+]
+FAILOVER_STEP_TIMEOUT = 10  # giây chờ mỗi bước trước khi coi là lỗi và chuyển bước kế
+FAILOVER_FREEZE_SECONDS = 300  # bước vừa lỗi bị "đóng băng" (bỏ qua) trong 5 phút
 
 
 def _is_public_url(url: str) -> bool:
@@ -42,6 +58,7 @@ class ChatAI(commands.Cog):
         self.bot = bot
         self.api_key = OPENROUTER_API_KEY
         self.message_buffers = {}
+        self._frozen_until = {}  # step_index (trong FAILOVER_CHAIN) -> timestamp hết đóng băng
         self._reload_config()
         
     def get_buffer(self, channel_id_str):
@@ -62,109 +79,25 @@ class ChatAI(commands.Cog):
             
         self.library_file = os.path.join(STORAGE_DIR, "tnc_library_v1.json")
         self.library_data = load_json(self.library_file, list)
-        
-        self.current_model = self.ai_config.get("model", OPENROUTER_MODEL)
-        self.available_models = self.ai_config.get("available_models", [
-            "google/gemini-3.5-flash-lite",
-            "google/gemini-2.5-flash",
-            "openai/gpt-4o-mini"
-        ])
-        
-        if OPENROUTER_API_KEY or GEMINI_API_KEY:
+
+        if OPENROUTER_API_KEY or GEMINI_API_KEY or OLLAMA_API_KEY:
             instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
             if os.path.exists(instruction_path):
                 try:
                     with open(instruction_path, "r", encoding="utf-8") as f:
-                        self.system_instruction = f.read().replace("{CURRENT_MODEL}", self.current_model)
+                        self.system_instruction = f.read()
                 except Exception as e:
                     print(f"⚠️ Warning: Lỗi khi đọc file instruction: {e}. Sử dụng cấu hình mặc định.")
                     self.system_instruction = self._get_default_instruction()
             else:
                 self.system_instruction = self._get_default_instruction()
         else:
-            print("⚠️ WARNING: Chưa cấu hình OPENROUTER_API_KEY lẫn GEMINI_API_KEY. Tính năng AI sẽ không hoạt động.")
+            print("⚠️ WARNING: Chưa cấu hình API Key nào (OpenRouter/Gemini/Ollama). Tính năng AI sẽ không hoạt động.")
             self.system_instruction = None
 
     aimodel_group = app_commands.Group(name="aimodel", description="Quản lý Model AI")
     aichat_group = app_commands.Group(name="aichat", description="Quản lý Hành vi Chat của Bot")
     ailibrary_group = app_commands.Group(name="ailibrary", description="Quản lý Thư viện Kiến thức")
-
-    async def autocomplete_model(self, interaction: discord.Interaction, current: str):
-        self._reload_config()
-        models = self.available_models
-        return [
-            app_commands.Choice(name=m, value=m)
-            for m in models if current.lower() in m.lower()
-        ][:25]
-
-    @aimodel_group.command(name="view", description="Xem model đang sử dụng và danh sách model có sẵn")
-    async def aimodel_view(self, interaction: discord.Interaction):
-        self._reload_config()
-        model_list = "\n".join([f"- `{m}`" for m in self.available_models])
-        msg = f"🧠 **Model hiện tại:** `{self.current_model}`\n\n📝 **Danh sách model có sẵn:**\n{model_list}"
-        await interaction.response.send_message(msg, ephemeral=False)
-
-    @aimodel_group.command(name="set", description="Đổi model AI hiện tại")
-    @app_commands.describe(model_name="Chọn model từ danh sách thả xuống")
-    @app_commands.autocomplete(model_name=autocomplete_model)
-    async def aimodel_set(self, interaction: discord.Interaction, model_name: str):
-        self._reload_config()
-        if not is_officer(interaction.user):
-            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị (Officer trở lên) mới được quyền đổi Model AI!", ephemeral=True)
-            return
-
-        if model_name not in self.available_models:
-            await interaction.response.send_message(f"⚠️ Model `{model_name}` không có trong danh sách! Dùng `/aimodel add` để thêm trước, hoặc chọn đúng model gợi ý trong autocomplete.", ephemeral=True)
-            return
-
-        self.current_model = model_name
-        self.ai_config["model"] = model_name
-        save_json(self.ai_config, self.ai_config_file)
-        
-        # Reload instruction
-        instruction_path = os.path.join(DATA_DIR, "core", "templates", "chat_ai_instruction.txt")
-        if os.path.exists(instruction_path):
-            with open(instruction_path, "r", encoding="utf-8") as f:
-                self.system_instruction = f.read().replace("{CURRENT_MODEL}", self.current_model)
-                
-        await interaction.response.send_message(f"✅ Đã đổi Model AI thành công sang: **{self.current_model}**", ephemeral=False)
-
-    @aimodel_group.command(name="add", description="Thêm một model mới vào danh sách")
-    @app_commands.describe(model_name="Tên model mới (VD: anthropic/claude-3.5-sonnet)")
-    async def aimodel_add(self, interaction: discord.Interaction, model_name: str):
-        self._reload_config()
-        if not is_officer(interaction.user):
-            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
-            return
-            
-        if model_name in self.available_models:
-            await interaction.response.send_message(f"⚠️ Model `{model_name}` đã có trong danh sách rồi!", ephemeral=True)
-            return
-            
-        self.available_models.append(model_name)
-        self.ai_config["available_models"] = self.available_models
-        save_json(self.ai_config, self.ai_config_file)
-        
-        await interaction.response.send_message(f"✅ Đã thêm model `{model_name}` vào danh sách thành công!", ephemeral=False)
-
-    @aimodel_group.command(name="remove", description="Xóa một model khỏi danh sách")
-    @app_commands.describe(model_name="Chọn model cần xóa")
-    @app_commands.autocomplete(model_name=autocomplete_model)
-    async def aimodel_remove(self, interaction: discord.Interaction, model_name: str):
-        self._reload_config()
-        if not is_officer(interaction.user):
-            await interaction.response.send_message("❌ Xin lỗi, chỉ có Ban quản trị mới được quyền!", ephemeral=True)
-            return
-            
-        if model_name not in self.available_models:
-            await interaction.response.send_message(f"⚠️ Model `{model_name}` không có trong danh sách!", ephemeral=True)
-            return
-            
-        self.available_models.remove(model_name)
-        self.ai_config["available_models"] = self.available_models
-        save_json(self.ai_config, self.ai_config_file)
-        
-        await interaction.response.send_message(f"✅ Đã xóa model `{model_name}` khỏi danh sách!", ephemeral=False)
 
     @aimodel_group.command(name="balance", description="Kiểm tra số dư Credit và trạng thái giới hạn API của AI")
     async def aimodel_balance(self, interaction: discord.Interaction):
@@ -209,30 +142,7 @@ class ChatAI(commands.Cog):
                             msg += f"- 💳 **Giới hạn:** Không giới hạn (hoặc nạp pay-as-you-go)\n"
                             
                         msg += f"- 🆓 **Gói Free Tier:** {'Có' if is_free else 'Không'}\n"
-                        
-                        # Ước tính số request còn lại
-                        try:
-                            async with session.get("https://openrouter.ai/api/v1/models", timeout=10) as model_resp:
-                                if model_resp.status == 200:
-                                    models_data = await model_resp.json()
-                                    cur_model = next((m for m in models_data.get("data", []) if m["id"] == self.current_model), None)
-                                    if cur_model:
-                                        pricing = cur_model.get("pricing", {})
-                                        p_prompt = float(pricing.get("prompt", 0))
-                                        p_comp = float(pricing.get("completion", 0))
-                                        
-                                        if p_prompt == 0 and p_comp == 0:
-                                            msg += f"\n🔮 **ƯỚC TÍNH SỨC CHỊU ĐỰNG CỦA BOT:**\n- 🤖 Model hiện tại (`{self.current_model}`) đang là **Miễn phí (Free)**.\n- 🚀 Số request còn lại: **Vô hạn** (theo Credit).\n"
-                                        elif remaining < 9000:
-                                            # Giả định 1500 prompt token, 300 completion token mỗi request
-                                            avg_cost = (1500 * p_prompt) + (300 * p_comp)
-                                            if avg_cost > 0:
-                                                est_reqs = int(remaining / avg_cost)
-                                                msg += f"\n🔮 **ƯỚC TÍNH SỨC CHỊU ĐỰNG CỦA BOT:**\n- 🤖 Model: `{self.current_model}`\n- 💵 Phí trung bình: `${avg_cost:.5f}` / câu hỏi (tạm tính ~1800 tokens).\n- 🚀 Có thể trụ được khoảng: **~{est_reqs:,} câu hỏi nữa**.\n"
-                        except Exception as e:
-                            print(f"Lỗi ước tính request: {e}")
 
-                        
                         if requests == "Không giới hạn":
                             msg += f"- 🚦 **Rate Limit:** {requests}\n"
                         else:
@@ -599,6 +509,63 @@ class ChatAI(commands.Cog):
         except Exception as e:
             return f"[Không thể đọc link này do lỗi: {e}]"
 
+    async def _call_gemini(self, model: str, system_instruction: str, gemini_parts: list, timeout: int):
+        """Trả về text trả lời, None nếu thiếu API key, raise Exception nếu gọi lỗi."""
+        if not GEMINI_API_KEY:
+            return None
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "systemInstruction": {"parts": [{"text": system_instruction}]},
+            "contents": [{"parts": gemini_parts}],
+        }
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, json=payload) as resp:
+                data = await resp.json()
+                if resp.status != 200:
+                    raise RuntimeError(data.get("error", {}).get("message", f"HTTP {resp.status}"))
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    async def _call_openrouter(self, model: str, system_instruction: str, prompt: str, or_content: list, has_images: bool, timeout: int):
+        """Trả về text trả lời, None nếu thiếu API key, raise Exception nếu gọi lỗi."""
+        if not OPENROUTER_API_KEY:
+            return None
+        if not (model.endswith(":free") or model.endswith("/free")):
+            raise RuntimeError(f"Model '{model}' không có hậu tố ':free'/'/free' — chặn để tránh phát sinh chi phí ngoài ý muốn.")
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": or_content if has_images else prompt},
+            ],
+        }
+        headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
+                data = await resp.json()
+                if resp.status != 200:
+                    raise RuntimeError(data.get("error", {}).get("message", f"HTTP {resp.status}"))
+                return data["choices"][0]["message"]["content"]
+
+    async def _call_ollama(self, model: str, system_instruction: str, prompt: str, timeout: int):
+        """Trả về text trả lời, raise Exception nếu gọi lỗi (Ollama không bắt buộc API key)."""
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+        }
+        headers = {"Content-Type": "application/json"}
+        if OLLAMA_API_KEY:
+            headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(OLLAMA_URL, json=payload, headers=headers) as resp:
+                data = await resp.json()
+                if resp.status != 200:
+                    raise RuntimeError(data.get("error", f"HTTP {resp.status}"))
+                return data["message"]["content"]
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         # Bỏ qua tin nhắn từ chính bot hoặc các bot khác
@@ -674,7 +641,7 @@ class ChatAI(commands.Cog):
         if not (is_mentioned or is_reply or is_keyword_trigger or is_random_intercept):
             return
 
-        if not (OPENROUTER_API_KEY or GEMINI_API_KEY):
+        if not (OPENROUTER_API_KEY or GEMINI_API_KEY or OLLAMA_API_KEY):
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
             return
 
@@ -866,67 +833,48 @@ class ChatAI(commands.Cog):
         # Bật typing indicator
         async with message.channel.typing():
             try:
-                is_gemini = self.current_model.startswith("google/")
+                now = time.time()
+                steps_to_try = [i for i in range(len(FAILOVER_CHAIN)) if self._frozen_until.get(i, 0) <= now]
+                if not steps_to_try:
+                    # Tất cả các bước đang bị đóng băng -> bỏ qua đóng băng, thử lại hết
+                    steps_to_try = list(range(len(FAILOVER_CHAIN)))
 
-                provider_name = "Gemini" if is_gemini else "OpenRouter"
+                reply_text = None
+                last_error = None
 
-                if is_gemini:
-                    if not GEMINI_API_KEY:
-                        await message.reply("⚠️ Model hiện tại là Gemini nhưng chưa cấu hình `GEMINI_API_KEY` — đổi model khác bằng `/aimodel set` hoặc thêm key vào `.env`.")
-                        return
-                    gemini_model = self.current_model.split("/", 1)[1]
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={GEMINI_API_KEY}"
-                    payload = {
-                        "systemInstruction": {"parts": [{"text": self.system_instruction}]},
-                        "contents": [{"parts": gemini_parts}],
-                    }
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(url, json=payload) as resp:
-                            try:
-                                data = await resp.json()
-                            except Exception:
-                                text_resp = await resp.text()
-                                data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+                for i in steps_to_try:
+                    step = FAILOVER_CHAIN[i]
+                    provider, model = step["provider"], step["model"]
 
-                            if resp.status == 429:
-                                error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
-                                await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API {provider_name} của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
-                                return
-                            elif resp.status != 200:
-                                error_msg = data.get("error", {}).get("message", "Unknown API Error")
-                                await message.reply(f"❌ Á đù, gọi API {provider_name} bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
-                                return
-                else:
-                    # Gọi OpenRouter API
-                    payload = {
-                        "model": self.current_model,
-                        "messages": [
-                            {"role": "system", "content": self.system_instruction},
-                            {"role": "user", "content": or_content if has_images else prompt},
-                        ],
-                    }
-                    headers = {"Authorization": f"Bearer {self.api_key}"}
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(OPENROUTER_URL, json=payload, headers=headers) as resp:
-                            try:
-                                data = await resp.json()
-                            except Exception:
-                                text_resp = await resp.text()
-                                data = {"error": {"message": f"Không thể parse JSON. Phản hồi: {text_resp[:100]}"}}
+                    # minimax-m3/gpt-oss:120b (Ollama) không hỗ trợ vision -> bỏ qua khi tin nhắn có ảnh
+                    if provider == "ollama" and has_images:
+                        continue
 
-                            if resp.status == 429:
-                                error_msg = data.get("error", {}).get("message", "Rate limit exceeded")
-                                await message.reply(f"⚠️ Thôi toang rồi anh em ơi! Khóa API {provider_name} của tui vừa hết hạn mức sử dụng (Lỗi 429 Rate Limit). 💸\nChi tiết: `{error_msg}`")
-                                return
-                            elif resp.status != 200:
-                                error_msg = data.get("error", {}).get("message", "Unknown API Error")
-                                await message.reply(f"❌ Á đù, gọi API {provider_name} bị lỗi rồi (Mã {resp.status})! 😬\nChi tiết: `{error_msg}`")
-                                return
+                    step_instruction = self.system_instruction.replace("{CURRENT_MODEL}", model)
 
-                if is_gemini:
-                    reply_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                else:
-                    reply_text = data["choices"][0]["message"]["content"]
+                    try:
+                        if provider == "gemini":
+                            result = await self._call_gemini(model, step_instruction, gemini_parts, FAILOVER_STEP_TIMEOUT)
+                        elif provider == "openrouter":
+                            result = await self._call_openrouter(model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
+                        else:
+                            result = await self._call_ollama(model, step_instruction, prompt, FAILOVER_STEP_TIMEOUT)
+                    except Exception as e:
+                        last_error = f"{provider}/{model}: {e}"
+                        self._frozen_until[i] = now + FAILOVER_FREEZE_SECONDS
+                        continue
+
+                    if result is None:
+                        # Provider chưa cấu hình API Key -> bỏ qua, không tính là lỗi
+                        continue
+
+                    reply_text = result
+                    break
+
+                if reply_text is None:
+                    print(f"❌ Toàn bộ chuỗi dự phòng AI đều lỗi. Lỗi cuối: {last_error}")
+                    await message.reply("Xin lỗi, hiện tại tất cả nguồn AI (Ollama/Gemini/OpenRouter) đều đang gặp sự cố. Vui lòng thử lại sau ít phút. 🙏")
+                    return
 
                 allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
 
@@ -941,7 +889,7 @@ class ChatAI(commands.Cog):
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                print(f"OpenRouter API Error: {e}")
+                print(f"Chat AI Error: {e}")
                 await message.reply(f"Xin lỗi, tôi đang gặp lỗi khi kết nối với AI hoặc xử lý yêu cầu này.\nLỗi kỹ thuật: `{type(e).__name__}: {e}`")
 
 async def setup(bot: commands.Bot):

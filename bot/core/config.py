@@ -12,7 +12,7 @@ GIT_URL = os.getenv("GITHUB_GIT_URL", "")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "712258265769050164"))
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 
 # Thư mục bot/ — dùng cho file config/template và file tạm
 DATA_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -36,19 +36,29 @@ scripts/                 Script tiện ích dùng chung trong workspace
 | **GuildCheck** | `/registertnc`, `/registerfor`, `/myign`, `/guildconfig`, `/guildcheck`, `/unresolved` | Đăng ký IGN Albion, tự kiểm tra qua Albion API xem còn trong guild không, tự xóa role nếu đã rời |
 | **Alo (TTS)** | `/alojoin`, `/aloleave`, `/alonametoggle`, `/alo`, `/aloconfig`, `/alomute`, `/alounmute` | Đọc tin nhắn text thành giọng nói (gTTS) vào voice channel, tự rejoin khi rớt mạng |
 | **Core-Bank** | `/coresetup`, `/coreadd`, `/coreremove`, `/coreautoreact`, `/corelist` | Tự động thả emoji reaction lên ảnh core nộp vào kênh, quy đổi ra giá trị silver |
-| **Chat AI** | Tag bot / reply bot, `/aimodel view`, `/aimodel set`, `/aimodel add`, `/aimodel remove` | Chat AI theo tính cách tùy chỉnh (xem [Cấu hình AI Chat](#cấu-hình-ai-chat)), đọc context kênh/link/reply, đổi model qua OpenRouter hoặc Google trực tiếp |
+| **Chat AI** | Tag bot / reply bot, `/aimodel balance`, `/wiki` | Chat AI theo tính cách tùy chỉnh (xem [Cấu hình AI Chat](#cấu-hình-ai-chat)), đọc context kênh/link/reply, tự xoay vòng qua 3 nhà cung cấp (Ollama/Gemini/OpenRouter) khi bên nào lỗi |
 
 Phân quyền dựa theo **tên role Discord**: `officer`, `guild master`, `admin`, `phó hội`, `chủ hội`.
 ## Cấu hình AI Chat
 
-Cog `chat_ai` hỗ trợ 2 nhà cung cấp model, chọn qua tên model:
+Cog `chat_ai` gọi lần lượt qua **3 nhà cung cấp** (Ollama, Google Gemini, OpenRouter) theo 1 chuỗi dự phòng cố định — không cần chọn model thủ công. Mỗi tin nhắn, bot thử từng bước theo thứ tự, bước nào lỗi (không phải HTTP 200, timeout, hoặc JSON không parse được) thì tự chuyển ngay bước kế tiếp:
 
-- Model **không** có prefix `google/` → gọi qua **OpenRouter** (`OPENROUTER_API_KEY`).
-- Model **có** prefix `google/` (vd `google/gemini-3.5-flash-lite`) → gọi thẳng **Google AI Studio** bằng `GEMINI_API_KEY`, không qua OpenRouter — giúp bot còn dùng được nếu OpenRouter bị sập/hit rate limit.
+1. Ollama — `minimax-m3`
+2. Google Gemini — `gemini-3.5-flash-lite`
+3. OpenRouter — `nvidia/nemotron-3-ultra-550b-a55b:free`
+4. Google Gemini — `gemini-3.1-flash-lite`
+5. OpenRouter — `inclusionai/ling-3.0-flash:free`
+6. Google Gemini — `gemini-2.5-flash`
+7. Ollama — `gpt-oss:120b`
+8. OpenRouter — `openrouter/free`
 
-- **Tính cách bot**: sửa trực tiếp file text [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt) — không cần đụng code. Bot tự đọc file này lúc khởi động, nên sửa xong phải **restart bot** mới áp dụng. File có placeholder `{CURRENT_MODEL}` được tự động thay bằng model đang active. Nếu file trống hoặc bị xóa, bot fallback về cấu hình mặc định khai báo trong `chat_ai.py`.
-- **Đổi model qua Discord**: `/aimodel view` (xem model hiện tại + danh sách), `/aimodel set` (đổi model đang dùng), `/aimodel add`/`/aimodel remove` (thêm/xóa model khỏi danh sách) — chỉ Officer trở lên dùng được. Lựa chọn được lưu vào `bot/tnc_ai_config.json` (tự sync GitHub) nên vẫn giữ nguyên sau khi bot restart.
-- **Đổi model mặc định lúc chưa từng dùng `/aimodel`**: sửa biến `OPENROUTER_MODEL` trong `.env` (local) hoặc Environment Variables trên Render (production).
+Chuỗi này khai báo trong hằng số `FAILOVER_CHAIN` ở đầu file `bot/cogs/chat_ai.py` (đổi thứ tự/model thì sửa trực tiếp code, không có lệnh Discord để chỉnh).
+
+- **Timeout mỗi bước**: 10 giây (`FAILOVER_STEP_TIMEOUT`) — quá thời gian này coi như lỗi và chuyển bước kế.
+- **Đóng băng bước lỗi**: bước nào vừa lỗi sẽ bị bỏ qua trong 5 phút (`FAILOVER_FREEZE_SECONDS`) để tránh chờ timeout lặp lại ở tin nhắn sau; nếu tất cả các bước đều đang đóng băng thì bot bỏ qua đóng băng và thử lại toàn bộ chuỗi.
+- **Vision (đọc ảnh)**: 2 model Ollama không hỗ trợ ảnh — nếu tin nhắn có đính kèm ảnh, bước Ollama sẽ tự bị bỏ qua trong lần thử đó.
+- **Tính cách bot**: sửa trực tiếp file text [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt) — không cần đụng code. Bot tự đọc file này lúc khởi động, nên sửa xong phải **restart bot** mới áp dụng. File có placeholder `{CURRENT_MODEL}` được tự động thay bằng tên model của bước đang thử. Nếu file trống hoặc bị xóa, bot fallback về cấu hình mặc định khai báo trong `chat_ai.py`.
+- **Kiểm tra số dư OpenRouter**: `/aimodel balance` (không cần quyền Officer).
 
 ### Test AI chat ngoài Discord
 
@@ -92,8 +102,8 @@ Biến môi trường cần thiết (xem [bot/.env.example](bot/.env.example)):
 | `DISCORD_GUILD_ID` | ID server Discord |
 | `GITHUB_GIT_URL` | URL GitHub kèm Personal Access Token, dùng để auto-sync dữ liệu |
 | `OPENROUTER_API_KEY` | API key OpenRouter, dùng cho tính năng chat AI (cog `chat_ai`) |
-| `OPENROUTER_MODEL` | Model OpenRouter dùng cho chat AI (để trống sẽ dùng model mặc định trong code) |
-| `GEMINI_API_KEY` | API key Google AI Studio, chỉ cần khi chọn model có prefix `google/` qua `/aimodel` |
+| `GEMINI_API_KEY` | API key Google AI Studio, dùng cho các bước Gemini trong chuỗi dự phòng AI |
+| `OLLAMA_API_KEY` | API key Ollama Cloud (`ollama.com`), dùng cho các bước Ollama trong chuỗi dự phòng AI (tùy chọn, một số endpoint không bắt buộc) |
 
 Bot expose Flask server tại `http://localhost:5000` (Online: [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/)):
 - `GET /` — Trang giới thiệu & trạng thái bot (HTML)
