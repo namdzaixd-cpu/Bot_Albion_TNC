@@ -33,7 +33,7 @@ Trong khi đang chat với bot ở Terminal, bạn chỉ cần gõ:
 > /model
 ```
 Hệ thống sẽ dừng chat tạm thời, hiển thị lại menu danh sách model để bạn chọn model mới và tiếp tục cuộc hội thoại ngay lập tức.
-*(Lưu ý: Lệnh này được hỗ trợ trên `test_api_full.py`, `test_api_full_with_instruction.py`, `test_gemini.py`, và `test_ollama.py`)*
+*(Lưu ý: Lệnh này được hỗ trợ trên `test_api_full.py`, `test_api_full_with_instruction.py`, `test_gemini.py`, `test_ollama.py`, và `test_openrouter.py`)*
 
 ### 🔒 2. Cơ chế tự động chặn phí (Cost Safety) trên OpenRouter
 Để bảo vệ số dư tài khoản của bạn, hệ thống áp dụng cơ chế chặn nghiêm ngặt:
