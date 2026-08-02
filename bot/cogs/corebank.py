@@ -64,9 +64,15 @@ class CoreBankCog(commands.Cog):
             return
         try:
             core_config = load_coreconfig()
-            if core_config.get("auto_react", False) and str(message.channel.id) == core_config.get("core_channel_id"):
-                if message.attachments:
-                    emoji_map = core_config.get("emoji_map", {})
+            if core_config.get("auto_react", False):
+                core_ch_id = core_config.get("core_channel_id")
+                is_core = str(message.channel.id) == core_ch_id
+                if not is_core and hasattr(message.channel, "parent_id"):
+                    is_core = str(message.channel.parent_id) == core_ch_id
+                
+                if is_core:
+                    if message.attachments:
+                        emoji_map = core_config.get("emoji_map", {})
 
                     # Xử lý tách ảnh nếu có nhiều hơn 1 ảnh
                     if len(message.attachments) > 1:
@@ -116,12 +122,12 @@ class CoreBankCog(commands.Cog):
 
     @app_commands.command(name="coresetup", description="Cài đặt kênh cho hệ thống Core-Bank (Officer only)")
     @app_commands.describe(
-        core_channel="Kênh #core-vortex nơi member đăng ảnh",
+        core_channel="Kênh #core-vortex hoặc Diễn đàn nơi member đăng ảnh",
         bank_channel="Kênh bot gửi lệnh !add-money / !remove-money cho UnbelievaBoat"
     )
     async def coresetup_cmd(self, interaction: discord.Interaction,
-                             core_channel: discord.TextChannel,
-                             bank_channel: discord.TextChannel):
+                             core_channel: discord.abc.GuildChannel,
+                             bank_channel: discord.abc.GuildChannel):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
         config = load_coreconfig()
@@ -233,8 +239,23 @@ class CoreBankCog(commands.Cog):
         bank_ch_id = config.get("bank_channel_id")
         emoji_map = config.get("emoji_map", {})
 
-        # Chỉ xử lý trong kênh core đã cài
-        if not core_ch_id or str(payload.channel_id) != core_ch_id:
+        # Chỉ xử lý trong kênh core đã cài hoặc thread thuộc kênh core
+        if not core_ch_id:
+            return
+        
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+            
+        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
+        if not channel:
+            return
+            
+        is_core = str(payload.channel_id) == core_ch_id
+        if not is_core and hasattr(channel, "parent_id"):
+            is_core = str(channel.parent_id) == core_ch_id
+            
+        if not is_core:
             return
 
         emoji_key = get_reaction_key(payload.emoji)
@@ -338,7 +359,22 @@ class CoreBankCog(commands.Cog):
         bank_ch_id = config.get("bank_channel_id")
         emoji_map = config.get("emoji_map", {})
 
-        if not core_ch_id or str(payload.channel_id) != core_ch_id:
+        if not core_ch_id:
+            return
+            
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+            
+        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
+        if not channel:
+            return
+            
+        is_core = str(payload.channel_id) == core_ch_id
+        if not is_core and hasattr(channel, "parent_id"):
+            is_core = str(channel.parent_id) == core_ch_id
+            
+        if not is_core:
             return
 
         emoji_key = get_reaction_key(payload.emoji)
