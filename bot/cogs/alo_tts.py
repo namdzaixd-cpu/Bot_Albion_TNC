@@ -8,14 +8,13 @@ from discord import app_commands
 from discord.ext import commands
 from gtts import gTTS
 
-from core.config import DATA_DIR, STORAGE_DIR
+from core.config import DATA_DIR
 from core.permissions import is_officer
-from core.storage import load_json, save_json
+from core.database import supabase
 
 # ==============================================================================
 # HỆ THỐNG TTS VOICE "ALO" (Bot join voice, đọc chat bằng giọng Google TTS)
 # ==============================================================================
-TTS_CONFIG_FILE = os.path.join(STORAGE_DIR, "tnc_tts_config_v1.json")
 
 MENTION_RE = re.compile(r"<@!?(\d+)>")
 CHANNEL_MENTION_RE = re.compile(r"<#(\d+)>")
@@ -24,11 +23,30 @@ URL_RE = re.compile(r"https?://\S+")
 
 
 def load_tts_config():
-    return load_json(TTS_CONFIG_FILE, lambda: {"read_name": {}, "rejoin": {}, "afk": {}})
+    data = {"read_name": {}, "rejoin": {}, "afk": {}}
+    try:
+        resp = supabase.table("alo_tts_config").select("*").eq("id", 1).execute()
+        if resp.data:
+            row = resp.data[0]
+            data["read_name"] = row.get("read_name", {})
+            data["rejoin"] = row.get("rejoin", {})
+            data["afk"] = row.get("afk", {})
+    except Exception as e:
+        print(f"Error loading alo_tts_config from Supabase: {e}")
+    return data
 
 
 def save_tts_config(data):
-    save_json(data, TTS_CONFIG_FILE)
+    try:
+        record = {
+            "id": 1,
+            "read_name": data.get("read_name", {}),
+            "rejoin": data.get("rejoin", {}),
+            "afk": data.get("afk", {})
+        }
+        supabase.table("alo_tts_config").upsert(record).execute()
+    except Exception as e:
+        print(f"Error saving alo_tts_config to Supabase: {e}")
 
 
 def clean_text_for_tts(message: discord.Message) -> str:

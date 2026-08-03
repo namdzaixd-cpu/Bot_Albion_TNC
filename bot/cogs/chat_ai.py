@@ -21,7 +21,9 @@ from discord.ext import commands
 
 from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OLLAMA_API_KEY
 from core.permissions import is_officer
+from core.permissions import is_officer
 from core.storage import load_json, save_json
+from core.database import supabase
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OLLAMA_URL = "https://ollama.com/api/chat"
@@ -68,15 +70,28 @@ class ChatAI(commands.Cog):
             self.message_buffers[channel_id_str] = collections.deque(maxlen=size)
         return self.message_buffers[channel_id_str]
         
+    def _save_ai_config(self):
+        try:
+            self.ai_config["guild_id"] = "default"
+            supabase.table("ai_config").upsert(self.ai_config).execute()
+        except Exception as e:
+            print(f"Error saving ai_config: {e}")
+
     def _reload_config(self):
-        self.ai_config_file = os.path.join(STORAGE_DIR, "tnc_ai_config.json")
-        self.ai_config = load_json(self.ai_config_file, dict)
-        if "channel_buffers" not in self.ai_config:
-            self.ai_config["channel_buffers"] = {}
-        if "intercept_channels" not in self.ai_config:
-            self.ai_config["intercept_channels"] = []
-        if "autowiki_channels" not in self.ai_config:
-            self.ai_config["autowiki_channels"] = []
+        self.ai_config = {
+            "channel_buffers": {}, 
+            "intercept_channels": [], 
+            "autowiki_channels": [], 
+            "library_channel_ids": [], 
+            "vision_channels": [], 
+            "model": "inclusionai/ling-3.0-flash:free"
+        }
+        try:
+            resp = supabase.table("ai_config").select("*").eq("guild_id", "default").execute()
+            if resp.data:
+                self.ai_config.update(resp.data[0])
+        except Exception as e:
+            print(f"Error loading ai_config from Supabase: {e}")
             
         self.library_file = os.path.join(STORAGE_DIR, "tnc_library_v1.json")
         self.library_data = load_json(self.library_file, list)
@@ -169,7 +184,7 @@ class ChatAI(commands.Cog):
             
         channel_id = str(interaction.channel_id)
         self.ai_config["channel_buffers"][channel_id] = size
-        save_json(self.ai_config, self.ai_config_file)
+        self._save_ai_config()
         
         # Reset buffer for this channel
         self.message_buffers[channel_id] = collections.deque(maxlen=size)
@@ -195,13 +210,13 @@ class ChatAI(commands.Cog):
             if channel_id not in intercepts:
                 intercepts.append(channel_id)
                 self.ai_config["intercept_channels"] = intercepts
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **BẬT** tính năng hóng hớt (Nói leo ngẫu nhiên 2%) cho kênh này.", ephemeral=False)
         else:
             if channel_id in intercepts:
                 intercepts.remove(channel_id)
                 self.ai_config["intercept_channels"] = intercepts
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
 
     async def _image_to_base64(self, url: str) -> str:
@@ -277,12 +292,12 @@ class ChatAI(commands.Cog):
         if channel_id in library_ids:
             library_ids.remove(channel_id)
             self.ai_config["library_channel_ids"] = library_ids
-            save_json(self.ai_config, self.ai_config_file)
+            self._save_ai_config()
             await interaction.response.send_message(f"✅ Đã **BỎ** kênh <#{channel_id}> khỏi danh sách Thư viện.", ephemeral=False)
         else:
             library_ids.append(channel_id)
             self.ai_config["library_channel_ids"] = library_ids
-            save_json(self.ai_config, self.ai_config_file)
+            self._save_ai_config()
             await interaction.response.send_message(f"✅ Đã **THÊM** kênh <#{channel_id}> vào danh sách Thư viện. Dùng `/aimodel library_scan` để quét dữ liệu.", ephemeral=False)
 
     async def _process_msg_for_docs(self, msg: discord.Message, title: str, docs: list):
@@ -386,13 +401,13 @@ class ChatAI(commands.Cog):
             if channel_id not in autowiki:
                 autowiki.append(channel_id)
                 self.ai_config["autowiki_channels"] = autowiki
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **BẬT** tính năng Tự động tra cứu Wiki cho kênh này. Bot sẽ thông minh hơn nhưng phản hồi chậm đi 1-2 giây.", ephemeral=False)
         else:
             if channel_id in autowiki:
                 autowiki.remove(channel_id)
                 self.ai_config["autowiki_channels"] = autowiki
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
 
     @aichat_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
@@ -414,13 +429,13 @@ class ChatAI(commands.Cog):
             if channel_id not in vision_channels:
                 vision_channels.append(channel_id)
                 self.ai_config["vision_channels"] = vision_channels
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **BẬT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này. Lưu ý: có thể tốn token API.", ephemeral=False)
         else:
             if channel_id in vision_channels:
                 vision_channels.remove(channel_id)
                 self.ai_config["vision_channels"] = vision_channels
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **TẮT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này.", ephemeral=False)
 
     def _get_default_instruction(self) -> str:
