@@ -133,7 +133,11 @@ Khi có yêu cầu mới, rule mới hoặc chỉ dẫn từ người dùng (Use
 Từ nay khi user mô tả tính năng mới trong quá trình phát triển, BẮT BUỘC phải tự động lưu mô tả cơ chế hoạt động và chi tiết cách hoạt động của tính năng đó vào một file riêng (vd: `docs/features.md` hoặc một markdown file tương ứng). 
 Việc này đảm bảo dữ liệu không bị thất lạc và có thể dùng trực tiếp để đưa lên web dashboard hoặc viết tài liệu hướng dẫn sau này.
 
+## Quy tắc quản lý Script tiện ích (Helper/Hotfix)
+Khi tạo các script tiện ích, script vá lỗi (helper/hotfix/utility scripts) phát sinh trong quá trình phát triển dự án, BẮT BUỘC phải đặt chúng vào thư mục [scripts/](file:///Users/twot/Documents/CODE/Bot_Albion_TNC/scripts) thay vì thư mục gốc (root directory). Việc này giúp giữ cho thư mục gốc luôn gọn gàng và dễ dàng tìm kiếm/tham khảo các script này khi cần.
+
 ## Ngôn ngữ & xưng hô
+
 
 Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi.
 - Tuyệt đối làm theo đúng luồng: (1) Lắng nghe ý tưởng -> (2) Phân tích 3 phương án -> (3) Đợi user chốt -> (4) Lên Implementation Plan chi tiết -> (5) Đợi chốt plan -> (6) Code.
