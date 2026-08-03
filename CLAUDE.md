@@ -288,3 +288,21 @@ BẮT BUỘC: Khi hoàn thành một tính năng hoặc đợt cập nhật có 
    - `02_task.md` (Từ Task list)
    - `03_walkthrough.md` (Từ Walkthrough)
 Không bao giờ được ném chung một đống file ra ngoài thư mục gốc hay các thư mục dùng chung, cũng không được ghi đè/xóa bỏ tài liệu cũ.
+
+## Thói quen (BẮT BUỘC TUÂN THỦ)
+
+Từ những kinh nghiệm và lịch sử commit, AI phải luôn tuân thủ các thói quen sau khi làm việc trên dự án này:
+
+1. **Cẩn tắc vô áy náy trên CI (Continuous Integration):**
+   - Mọi đoạn code khởi tạo kết nối Database (Supabase, SQL), gọi API bên ngoài, hoặc sử dụng cấu hình nhạy cảm đều BẮT BUỘC phải được bọc trong khối `try-except`.
+   - Phải kiểm tra sự tồn tại của biến môi trường trước khi khởi tạo để đảm bảo code không bao giờ crash (làm sập luồng test) trên môi trường CI (nơi thường không có sẵn file `.env`).
+
+2. **Đồng bộ Config môi trường:**
+   - Bất cứ khi nào thêm, xóa hoặc sửa một biến môi trường trong file `.env`, phải TỰ ĐỘNG cập nhật file `.env.example` tương ứng để đồng bộ cấu hình cho các thành viên khác trong team.
+
+3. **Nguyên tắc "Gọn gàng là số 1":**
+   - Không vứt vương vãi các script tiện ích (helper/hotfix) ngoài root. Auto tống vào thư mục `scripts/`.
+   - Rules mới sinh ra chỉ ghi vào `CLAUDE.md`, tuyệt đối không đẻ thêm file rules linh tinh.
+
+4. **Thẩm mỹ UI/Hình ảnh:**
+   - Khi thiết kế giao diện (UI) hoặc tạo sinh/chọn hình ảnh (ví dụ: avatar bot, icon), luôn ưu tiên phong cách tối giản (minimalist), tinh tế, rõ ràng và không rườm rà.
