@@ -18,16 +18,16 @@ class GlobalBlacklist:
     def _load(self):
         default_data = {"blacklist": []}
         if not os.path.exists(self.file_path):
-            save_json(default_data, self.file_path, sync_github=True)
+            save_json(self.file_path, default_data, sync_github=True)
             return default_data
         
-        data = load_json(self.file_path, dict)
+        data = load_json(self.file_path)
         if "blacklist" not in data:
             data["blacklist"] = []
         return data
         
     def save(self):
-        save_json(self.data, self.file_path, sync_github=True)
+        save_json(self.file_path, self.data, sync_github=True)
         
     def check_blacklist(self, discord_id: str, ingame_id: str) -> Optional[dict]:
         for entry in self.data["blacklist"]:
@@ -79,7 +79,8 @@ class BlacklistCog(commands.Cog):
                     player = next((p for p in players if p["Name"].lower() == ign.lower()), None)
                     if not player: return None
                     return player
-        except Exception:
+        except Exception as e:
+            print(f"[Error] {e}")
             return None
 
     blacklist_group = app_commands.Group(name="blacklist", description="Hệ thống Global Blacklist liên minh")

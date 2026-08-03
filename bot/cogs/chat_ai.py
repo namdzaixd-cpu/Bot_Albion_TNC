@@ -49,7 +49,8 @@ def _is_public_url(url: str) -> bool:
             return False
         ip = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
         return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
-    except Exception:
+    except Exception as e:
+        print(f"[Error] {e}")
         return False
 
 
@@ -325,7 +326,8 @@ class ChatAI(commands.Cog):
             if channel is None:
                 try:
                     channel = await self.bot.fetch_channel(int(lib_id))
-                except Exception:
+                except Exception as e:
+                    print(f"[Error] {e}")
                     continue
                     
             try:
@@ -334,14 +336,16 @@ class ChatAI(commands.Cog):
                         try:
                             async for msg in thread.history(limit=50, oldest_first=True):
                                 await self._process_msg_for_docs(msg, f"[{channel.name}] {thread.name}", docs)
-                        except Exception:
+                        except Exception as e:
+                            print(f"[Error] {e}")
                             pass
                     
                     async for thread in channel.archived_threads(limit=100):
                         try:
                             async for msg in thread.history(limit=50, oldest_first=True):
                                 await self._process_msg_for_docs(msg, f"[{channel.name}] {thread.name}", docs)
-                        except Exception:
+                        except Exception as e:
+                            print(f"[Error] {e}")
                             pass
                 else:
                     async for msg in channel.history(limit=1000, oldest_first=True):
@@ -362,33 +366,6 @@ class ChatAI(commands.Cog):
         self.library_data = []
         save_json(self.library_data, self.library_file)
         await interaction.response.send_message("✅ Đã xóa toàn bộ kiến thức trong Thư viện Nội bộ.", ephemeral=False)
-
-    async def _search_wiki_async(self, query: str) -> str:
-        if DDGS is None:
-            return "[LỖI: Chưa cài thư viện duckduckgo-search]"
-        try:
-            def _sync_search():
-                results = DDGS().text(f"site:wiki.albiononline.com {query}", max_results=3)
-                return list(results)
-            
-            results = await asyncio.to_thread(_sync_search)
-            if not results:
-                return "[Không tìm thấy thông tin trên Albion Wiki]"
-            
-            wiki_text = "Dữ liệu cào được từ Albion Wiki:\n"
-            for r in results:
-                wiki_text += f"- {r.get('title', '')}: {r.get('body', '')}\n"
-            return wiki_text
-        except Exception as e:
-            return f"[Lỗi tra cứu Wiki: {e}]"
-
-    @app_commands.command(name="wiki", description="Tra cứu kiến thức chuẩn từ Albion Wiki")
-    @app_commands.describe(query="Từ khóa cần tra cứu (VD: bloodletter, thetford cape)")
-    async def cmd_wiki(self, interaction: discord.Interaction, query: str):
-        await interaction.response.defer(ephemeral=False)
-        wiki_data = await self._search_wiki_async(query)
-        msg = f"🔍 **Đang tra cứu Wiki cho:** `{query}`\n\n{wiki_data}\n\n*Gợi ý: Gọi bot trả lời cùng với thông tin này!*"
-        await interaction.followup.send(msg)
 
     @ailibrary_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
@@ -660,7 +637,8 @@ class ChatAI(commands.Cog):
                 try:
                     url_text = await self._fetch_url_content(url)
                     web_context += f"--- Nội dung từ {url} ---\n{url_text}\n--------------------------------------\n\n"
-                except Exception:
+                except Exception as e:
+                    print(f"[Error] {e}")
                     web_context += f"--- Lỗi khi đọc {url} ---\n\n"
 
         # Tìm các channel được tag trong tin nhắn (dạng <#123456789> hoặc dạng link discord.com/channels/guild/channel)

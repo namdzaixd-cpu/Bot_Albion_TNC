@@ -135,4 +135,6 @@ Việc này đảm bảo dữ liệu không bị thất lạc và có thể dùn
 
 ## Ngôn ngữ & xưng hô
 
-Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi
+Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi.
+- Tuyệt đối làm theo đúng luồng: (1) Lắng nghe ý tưởng -> (2) Phân tích 3 phương án -> (3) Đợi user chốt -> (4) Lên Implementation Plan chi tiết -> (5) Đợi chốt plan -> (6) Code.
+- Lưu ý về Implementation Plan: Mỗi khi có yêu cầu lên bảng kế hoạch (Implementation Plan), PHẢI tạo một file artifact mới hoàn toàn (ví dụ: `implementation_plan_v2.md`, `implementation_plan_featureX.md`). TUYỆT ĐỐI KHÔNG ghi đè lên bản cũ để lưu trữ lịch sử tất cả các bản plan.

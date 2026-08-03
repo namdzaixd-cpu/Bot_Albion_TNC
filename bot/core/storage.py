@@ -20,9 +20,7 @@ GITHUB_SYNCED_FILES = [
     "bot/Storage/tnc_sp_v32.json",
     "bot/Storage/tnc_lastseen_v1.json",
     "bot/Storage/tnc_massing_v1.json",
-    "bot/Storage/tnc_register_v1.json",
     "bot/Storage/tnc_guildcheck_v1.json",
-    "bot/Storage/tnc_unresolved_v1.json",
     "bot/Storage/tnc_tts_config_v1.json",
     "bot/Storage/tnc_templates_v1.json",
     "bot/Storage/tnc_ai_config.json",
@@ -30,7 +28,6 @@ GITHUB_SYNCED_FILES = [
     "bot/Storage/tnc_coreconfig_v1.json",
     "bot/Storage/tnc_core_credited_v1.json",
     "bot/Storage/tnc_library_v1.json",
-    "bot/Storage/global_blacklist_v1.json",
 ]
 
 

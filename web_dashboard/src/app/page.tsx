@@ -144,7 +144,6 @@ export default function Home() {
               {[
                 { id: 'home', label: 'Giới Thiệu' },
                 { id: 'guide', label: 'Hướng Dẫn Cài Đặt' },
-                { id: 'leaderboard', label: 'Bảng Xếp Hạng SP' },
                 { id: 'blacklist', label: 'Global Blacklist' },
                 { id: 'credits', label: 'Đội Ngũ Tác Giả' },
               ].map((tab) => (
@@ -347,16 +346,91 @@ export default function Home() {
             )}
           </div>
         ) : activeTab === "guide" ? (
-          <div className="animate-fade-in text-center py-20 max-w-2xl mx-auto">
-            <div className="text-6xl mb-6">📚</div>
-            <h2 className="text-3xl font-bold mb-4">Hướng Dẫn Cài Đặt</h2>
-            <p className="text-text-muted leading-relaxed">Phần này đang được phát triển. Sắp tới sẽ có hướng dẫn chi tiết từ A-Z để cài đặt Bot TNC cho Discord Server của bạn. Bao gồm cấp quyền, thiết lập các kênh thông báo và bật/tắt các module tính năng.</p>
-          </div>
-        ) : activeTab === "leaderboard" ? (
-          <div className="animate-fade-in text-center py-20 max-w-2xl mx-auto">
-            <div className="text-6xl mb-6">🏆</div>
-            <h2 className="text-3xl font-bold mb-4">Bảng Xếp Hạng Siphoned Energy</h2>
-            <p className="text-text-muted leading-relaxed">Đang chuẩn bị kết nối dữ liệu Real-time với Bot API. Sắp tới các top player cống hiến Siphoned sẽ được vinh danh trực tiếp trên Website này!</p>
+          <div className="animate-fade-in py-12 max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="text-6xl mb-6">📚</div>
+              <h2 className="text-4xl font-bold mb-4">Hướng Dẫn Cài Đặt TNC Bot</h2>
+              <p className="text-text-muted text-lg">
+                Mã nguồn mở tại:{" "}
+                <a 
+                  href="https://github.com/namdzaixd-cpu/Bot_Albion_TNC" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-primary hover:underline font-semibold transition-colors"
+                >
+                  GitHub - Bot_Albion_TNC
+                </a>
+              </p>
+            </div>
+
+            <div className="space-y-6 text-left">
+              {/* Bước 1 */}
+              <div className="glass-panel p-6 sm:p-8 rounded-2xl relative overflow-hidden group hover:border-primary/50 transition-colors">
+                <div className="absolute top-0 left-0 w-2 h-full bg-primary"></div>
+                <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                  <span className="bg-primary/20 text-primary w-8 h-8 rounded-full flex items-center justify-center text-sm">1</span>
+                  Tải Mã Nguồn & Cài Đặt Môi Trường
+                </h3>
+                <div className="text-text-muted space-y-4 pl-11">
+                  <p>Bot được viết bằng <strong>Python</strong> và giao diện Web dùng <strong>Next.js</strong>. Bạn cần cài đặt Python 3.10+ và Node.js 18+ trên máy chủ.</p>
+                  <div className="bg-surface/50 p-4 rounded-lg font-mono text-sm border border-border shadow-inner">
+                    <p className="text-green-400 mb-1"># Clone repo về máy</p>
+                    <p className="text-gray-300">git clone https://github.com/namdzaixd-cpu/Bot_Albion_TNC.git</p>
+                    <p className="text-gray-300 mb-3">cd Bot_Albion_TNC</p>
+                    
+                    <p className="text-green-400 mb-1"># Cài đặt thư viện Python cho Bot</p>
+                    <p className="text-gray-300">pip install -r requirements.txt</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bước 2 */}
+              <div className="glass-panel p-6 sm:p-8 rounded-2xl relative overflow-hidden group hover:border-purple-500/50 transition-colors">
+                <div className="absolute top-0 left-0 w-2 h-full bg-purple-500"></div>
+                <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                  <span className="bg-purple-500/20 text-purple-400 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span>
+                  Thiết Lập Token & API
+                </h3>
+                <div className="text-text-muted space-y-4 pl-11">
+                  <p>Tạo file <code className="text-purple-400 bg-surface px-2 py-1 rounded-md text-sm border border-border">.env</code> ở thư mục gốc (hoặc copy từ <code className="text-purple-400 bg-surface px-2 py-1 rounded-md text-sm border border-border">.env.example</code>) và điền các cấu hình:</p>
+                  <ul className="list-disc pl-5 space-y-2 text-gray-300">
+                    <li>
+                      <strong>DISCORD_TOKEN:</strong> Lấy từ <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-primary hover:underline">Discord Developer Portal</a>. 
+                      <span className="text-red-400 ml-1 text-sm font-medium">Lưu ý: Bật đủ 3 quyền Privileged Gateway Intents.</span>
+                    </li>
+                    <li>
+                      <strong>GEMINI_API_KEY:</strong> (Tùy chọn) Lấy từ Google AI Studio nếu dùng tính năng Chatbot.
+                    </li>
+                  </ul>
+                  <div className="bg-surface/50 p-4 rounded-lg font-mono text-sm border border-border shadow-inner mt-2">
+                    <p className="text-gray-300">DISCORD_TOKEN=<span className="text-purple-300">MTEyMz... (Token bot của bạn)</span></p>
+                    <p className="text-gray-300">GEMINI_API_KEY=<span className="text-purple-300">AIzaSy... (API Key của Google)</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bước 3 */}
+              <div className="glass-panel p-6 sm:p-8 rounded-2xl relative overflow-hidden group hover:border-blue-500/50 transition-colors">
+                <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
+                <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                  <span className="bg-blue-500/20 text-blue-400 w-8 h-8 rounded-full flex items-center justify-center text-sm">3</span>
+                  Khởi Chạy Bot & API Server
+                </h3>
+                <div className="text-text-muted space-y-4 pl-11">
+                  <p>Chạy file main của bot. Hệ thống sẽ tự động khởi động cả Bot Discord và một Web API cục bộ (cổng 5000) để phục vụ cho Dashboard.</p>
+                  <div className="bg-surface/50 p-4 rounded-lg font-mono text-sm border border-border shadow-inner">
+                    <p className="text-green-400 mb-1"># Chạy bot (tại thư mục gốc của dự án)</p>
+                    <p className="text-gray-300">python bot/main.py</p>
+                  </div>
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex items-start gap-3 mt-2">
+                    <span className="text-blue-400">💡</span>
+                    <p className="text-sm text-blue-200">
+                      Bạn sẽ thấy log trên console thông báo Bot đã online và API Server đang lắng nghe trên cổng 5000.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="animate-fade-in text-center py-12 max-w-4xl mx-auto">

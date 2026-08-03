@@ -93,7 +93,8 @@ class CoreBankCog(commands.Cog):
                                             emoji_str = emoji_map[key]["display"]
                                             reaction = discord.PartialEmoji.from_str(emoji_str) if ":" in emoji_str else emoji_str
                                             await split_msg.add_reaction(reaction)
-                                        except Exception:
+                                        except Exception as e:
+                                            print(f"[Error] {e}")
                                             pass
                             except Exception as e:
                                 print(f"⚠️ [Core-Bank] Lỗi khi tách ảnh: {e}")
@@ -101,7 +102,8 @@ class CoreBankCog(commands.Cog):
                         # Xóa tin nhắn gốc sau khi đã tách thành công
                         try:
                             await message.delete()
-                        except Exception:
+                        except Exception as e:
+                            print(f"[Error] {e}")
                             pass
                         return  # Đã tách ảnh xong, dừng xử lý tin nhắn gốc
 
@@ -113,7 +115,8 @@ class CoreBankCog(commands.Cog):
                                 emoji_str = emoji_map[key]["display"]
                                 reaction = discord.PartialEmoji.from_str(emoji_str) if ":" in emoji_str else emoji_str
                                 await message.add_reaction(reaction)
-                            except Exception:
+                            except Exception as e:
+                                print(f"[Error] {e}")
                                 pass
         except Exception as e:
             print(f"⚠️ [Core-Bank] Lỗi khi tự động react: {e}")
@@ -251,7 +254,8 @@ class CoreBankCog(commands.Cog):
         if not channel:
             try:
                 channel = await guild.fetch_channel(payload.channel_id)
-            except Exception:
+            except Exception as e:
+                print(f"[Error] {e}")
                 return
 
             
@@ -285,7 +289,8 @@ class CoreBankCog(commands.Cog):
             return
         try:
             message = await channel.fetch_message(payload.message_id)
-        except Exception:
+        except Exception as e:
+            print(f"[Error] {e}")
             return
         author = message.author
 
@@ -374,7 +379,8 @@ class CoreBankCog(commands.Cog):
         if not channel:
             try:
                 channel = await guild.fetch_channel(payload.channel_id)
-            except Exception:
+            except Exception as e:
+                print(f"[Error] {e}")
                 return
 
             
@@ -424,7 +430,8 @@ class CoreBankCog(commands.Cog):
                 async with aiohttp.ClientSession() as session:
                     async with session.patch(api_url, headers=headers, json=payload_data):
                         pass
-            except Exception:
+            except Exception as e:
+                print(f"[Error] {e}")
                 pass
 
         channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
@@ -436,7 +443,8 @@ class CoreBankCog(commands.Cog):
                     f"_Gỡ bởi {reactor_mention}_",
                     reference=message
                 )
-            except Exception:
+            except Exception as e:
+                print(f"[Error] {e}")
                 pass
 
 

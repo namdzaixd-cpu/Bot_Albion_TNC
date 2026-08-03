@@ -29,9 +29,6 @@ FEATURE_FIELDS = [
     ),
     (
         "🛡️ GuildCheck",
-        "`/registertnc` (đăng ký IGN Albion)\n"
-        "`/registerfor` (đăng ký hộ member — Officer)\n"
-        "`/myign` (xem IGN đã đăng ký)\n"
         "`/guildconfig` (cấu hình GuildCheck — Officer)\n"
         "`/guildcheck` (check tay rời guild — Officer)\n"
         "`/unresolved` (xem danh sách chưa xác định — Officer)",
