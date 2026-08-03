@@ -18,6 +18,10 @@ Nếu không chắc user đã chốt hay chưa, hỏi lại "Chốt chưa?" và 
 Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh giá, tìm bug mà không sửa) không cần qua
 gate này — chỉ áp dụng cho việc _viết/sửa_ code.
 
+Quy tắc dấu hỏi: bất kỳ prompt nào kết thúc bằng dấu hỏi chấm `?` đều được coi là **câu hỏi /
+thảo luận** — KHÔNG viết/sửa code, chỉ trả lời và trao đổi. Quy tắc này áp dụng ngay cả khi nội
+dung câu hỏi liên quan đến code hoặc tính năng.
+
 Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` luôn, không cần hỏi lại
 "commit đi?" — user đã cấp quyền chuẩn.
 
