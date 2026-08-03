@@ -9,9 +9,14 @@ from discord.ext import commands
 from core.config import STORAGE_DIR, GUILD_NAME, GUILD_TAG, GUILD_ID, SUPABASE_URL, SUPABASE_KEY
 from core.storage import load_json, save_json
 from core.permissions import is_officer
-from supabase import create_client, Client
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"⚠️ Không thể khởi tạo Supabase client: {e}")
+else:
+    print("⚠️ WARNING: Chưa cấu hình Supabase URL hoặc Key. Tính năng Onboarding qua Supabase sẽ bị tắt.")
 
 class OnboardConfig:
     def __init__(self):
