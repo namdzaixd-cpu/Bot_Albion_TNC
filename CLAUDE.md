@@ -72,30 +72,32 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
   Storage lên GitHub). Chỉ chạy các script test độc lập (vd `test_api_key/*.py`, `py_compile`,
   test suite trong `bot/tests/`) — không chạy chính bot.
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
-  permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
-  guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
+  permissions, webserver, database) + `bot/cogs/` (mỗi hệ thống tính năng — about, alo_tts, blacklist,
+  chat_ai, corebank, guildcheck, lastseen, massing, onboarding, siphoned, wiki — là 1 cog riêng).
+  Sửa 1 tính năng thì chỉ đụng cog tương ứng.
 - Cấu hình AI Chat: Chỉ dẫn tính cách, prompt hệ thống nằm tại file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt). Chỉnh sửa file này thay vì sửa trực tiếp code Python trong cog.
 
-## Thư mục Storage — QUY TẮC BẮT BUỘC
+## Lưu trữ dữ liệu — QUY TẮC BẮT BUỘC (Supabase)
 
-`bot/Storage/` là nơi lưu trữ **dữ liệu vận hành thật** của bot (dữ liệu người dùng, cấu hình guild, template, điểm số...).
-Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có thay đổi (xem `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`).
+Dữ liệu vận hành thật của bot (dữ liệu người dùng, cấu hình guild, template, điểm số...) hiện được lưu trên
+**Supabase** — bảng `json_storage`, khóa theo tên file, qua lớp `load_json()` / `save_json()` trong
+`bot/core/storage.py`. Thư mục `bot/Storage/` là **legacy** từ thời lưu file JSON local (cơ chế sync
+GitHub `GITHUB_SYNCED_FILES` đã bị bỏ, `sync_to_github()`/`restore_from_github()` chỉ là stub) — không
+còn là nơi lưu dữ liệu vận hành thật.
 
 ### ⛔ TUYỆT ĐỐI KHÔNG được phép:
 
-- Xóa, ghi đè, hay sửa thẳng file JSON trong `bot/Storage/` — dù chỉ để test hay debug.
-- Đọc/ghi file trong thư mục này bằng `open()` thuần — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
-- Đặt file tạm, file test, file log vào đây — các file không phải dữ liệu kho sẽ làm ô nhiễm GitHub sync.
+- Đọc/ghi dữ liệu vận hành bằng `open()` thuần hay gọi thẳng Supabase — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
+- Sửa/xóa dữ liệu trực tiếp trên bảng `json_storage` qua console Supabase để "test nhanh" — mọi thay đổi phải qua code.
+- Đặt file tạm, file test, file log vào `bot/Storage/` — thư mục này không còn được sync nên dữ liệu đặt vào sẽ thất lạc.
 
 ### ✅ Quy tắc khi thêm dữ liệu mới:
 
-1. File JSON mới **phải** đặt vào `bot/Storage/`.
-2. Import `STORAGE_DIR` từ `bot/core/config.py`, khai báo đường dẫn bằng `os.path.join(STORAGE_DIR, "tên_file.json")`.
-3. Đặt tên file theo pattern: `tnc_<tính_năng>_v<số_version>.json`
-   - Ví dụ đúng: `tnc_massing_v1.json`, `tnc_register_v1.json`, `tnc_sp_v32.json`
-   - Ví dụ sai: `data.json`, `config_temp.json`, `test123.json`
-4. Thêm đường dẫn mới vào danh sách `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`.
-5. Đọc file chi tiết [bot/Storage/README.md](bot/Storage/README.md) trước khi thêm file mới.
+1. Mọi đọc/ghi dữ liệu phải qua `load_json()` / `save_json()` — không dùng `open()` thuần.
+2. Nếu cần thêm **bảng mới trên Supabase**: mô tả schema bảng (tên bảng, cột, kiểu, khóa chính) vào file docs của tính năng, và KHÔNG đụng bảng `json_storage` ngoài qua `storage.py`.
+3. Tên khóa/tên file vẫn theo pattern `tnc_<tính_năng>_v<số_version>` để dễ tra cứu trên Supabase.
+4. Mọi thao tác DB phải kiểm tra `SUPABASE_URL` / `SUPABASE_ANON_KEY` tồn tại và bọc trong `try-except` (xem mẫu ở `bot/core/database.py`) để không crash trên CI.
+5. Đọc file chi tiết [bot/Storage/README.md](bot/Storage/README.md) trước khi thay đổi dữ liệu.
 
 ## Skills & Agents có sẵn trong dự án
 
