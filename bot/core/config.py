@@ -16,6 +16,9 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+
 # Thư mục bot/ — dùng cho file config/template và file tạm
 DATA_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
