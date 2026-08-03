@@ -10,6 +10,8 @@ except ImportError:
 TOKEN = os.getenv("DISCORD_TOKEN", "")
 GIT_URL = os.getenv("GITHUB_GIT_URL", "")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "712258265769050164"))
+GUILD_NAME = os.getenv("GUILD_NAME", "The Northern Constellations")
+GUILD_TAG = os.getenv("GUILD_TAG", "TNC")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")

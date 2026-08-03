@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import STORAGE_DIR
+from core.config import STORAGE_DIR, GUILD_NAME, GUILD_TAG
 from core.storage import load_json, save_json
 from core.permissions import is_officer
 
