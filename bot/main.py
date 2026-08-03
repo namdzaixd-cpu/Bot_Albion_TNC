@@ -1,3 +1,4 @@
+import os
 import shutil
 
 import discord
@@ -20,6 +21,7 @@ EXTENSIONS = [
     "cogs.corebank",
     "cogs.chat_ai",
     "cogs.onboarding",
+    "cogs.wiki",
 ]
 
 
@@ -46,7 +48,8 @@ bot = TNCBot()
 async def on_ready():
     print(f"✅ Bot đã hoạt động: {bot.user} | ID: {bot.user.id}")
     print(f"🔍 [Check] ffmpeg path: {shutil.which('ffmpeg')}")
-    print(f"✅ TNC Bot v40 [Siphoned + Massing + GuildCheck + ALO-TTS + CoreBank] Online! Session: {BOT_SESSION_ID}")
+    bot_name = os.getenv("BOT_NAME", "TNT")
+    print(f"✅ {bot_name} v40 [Siphoned + Massing + GuildCheck + ALO-TTS + CoreBank] Online! Session: {BOT_SESSION_ID}")
 
 
 if __name__ == "__main__":

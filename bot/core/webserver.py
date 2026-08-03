@@ -23,7 +23,8 @@ def home():
     except Exception as e:
         print(f"❌ Lỗi load web template: {e}")
     
-    return f"🛡️ TNC Manager v40 [Siphoned + Massing + GuildCheck] Live! ID: {BOT_SESSION_ID}"
+    bot_name = os.getenv("BOT_NAME", "TNT")
+    return f"🛡️ {bot_name} Manager v40 [Siphoned + Massing + GuildCheck] Live! ID: {BOT_SESSION_ID}"
 
 
 def _run():

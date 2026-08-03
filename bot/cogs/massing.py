@@ -169,7 +169,8 @@ class SlotPickSelect(discord.ui.Select):
         )
         try:
             await self.parent_view.refresh_original(interaction, party)
-        except Exception:
+        except Exception as e:
+            print(f"[Error] {e}")
             pass
 
 
@@ -212,7 +213,8 @@ class MemberPickSelect(discord.ui.Select):
             await interaction.response.edit_message(content=f"✅ Đã kick <@{target_uid}> khỏi party.", view=None)
             try:
                 await self.parent_view.refresh_original(interaction, party)
-            except Exception:
+            except Exception as e:
+                print(f"[Error] {e}")
                 pass
         else:
             await interaction.response.edit_message(
@@ -269,7 +271,8 @@ class PartyView(discord.ui.View):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
         try:
             await interaction.response.send_message("❌ Party hết hạn do bot restart. Tạo party mới nhé!", ephemeral=True)
-        except Exception:
+        except Exception as e:
+            print(f"[Error] {e}")
             pass
 
     async def refresh_original(self, interaction, party):

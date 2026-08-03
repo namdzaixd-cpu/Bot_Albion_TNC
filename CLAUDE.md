@@ -2,10 +2,6 @@
 
 Xem [README.md](README.md) để biết tổng quan dự án, stack và cấu trúc code.
 
-> Lưu ý: `instruction.md` ở root là custom instructions cho **Claude.ai chat/Projects** (workflow
-> upload file, paste code vào Replit Shell) — không áp dụng cho Claude Code. File này (`CLAUDE.md`)
-> mới là instructions cho Claude Code.
-
 ## Quy trình làm việc — QUAN TRỌNG NHẤT
 
 Khi user đề xuất tính năng mới hoặc sửa đổi code: **bàn thiết kế trước** (mô tả lệnh, logic, ảnh
@@ -20,7 +16,28 @@ thông tin, hỏi ngược lại.
 Nếu không chắc user đã chốt hay chưa, hỏi lại "Chốt chưa?" và chờ — tuyệt đối không tự ý code.
 
 Ngoại lệ: các yêu cầu chỉ-đọc (đọc code, giải thích, đánh giá, tìm bug mà không sửa) không cần qua
-gate này — chỉ áp dụng cho việc *viết/sửa* code.
+gate này — chỉ áp dụng cho việc _viết/sửa_ code.
+
+Quy tắc dấu hỏi: bất kỳ prompt nào kết thúc bằng dấu hỏi chấm `?` đều được coi là **câu hỏi /
+thảo luận** — KHÔNG viết/sửa code, chỉ trả lời và trao đổi. Quy tắc này áp dụng ngay cả khi nội
+dung câu hỏi liên quan đến code hoặc tính năng.
+
+Sau khi code xong và pass `py_compile`: tự động `git add` + `git commit` luôn, không cần hỏi lại
+"commit đi?" — user đã cấp quyền chuẩn.
+
+Trước khi `git push`: đây là dự án dùng chung (có thể có người khác đã push thay đổi lên GitHub),
+nên BẮT BUỘC `git fetch` rồi kiểm tra xem remote (`origin/<branch>`) có commit mới nào mà local
+chưa có không.
+
+- Nếu remote không có gì mới, hoặc có commit mới nhưng merge/rebase sạch không xung đột: push
+  luôn, không cần hỏi lại.
+- Nếu phát hiện xung đột (cùng sửa 1 đoạn code, hoặc merge/rebase báo conflict): DỪNG LẠI, KHÔNG
+  tự ý resolve — báo rõ cho user biết file nào xung đột, xung đột với commit nào, và chờ user
+  quyết định cách xử lý.
+
+Sau khi push xong: kiểm tra xem máy local của user có đang chạy tiến trình bot thật không (vd
+`ps aux | grep "bot/main.py"`), nếu có thì `kill` luôn tiến trình đó — tránh trường hợp bot chạy
+song song cả ở local lẫn Render (xung đột Discord gateway, xung đột auto-sync Storage lên GitHub).
 
 ## Nguyên tắc code (Karpathy guidelines)
 
@@ -43,9 +60,17 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 - Code ngắn gọn, đủ tính năng, không dài dòng thừa.
 - Luôn check syntax (`python -m py_compile ...`) trước khi báo hoàn thành một thay đổi Python.
 - Sau khi thêm tính năng mới hoặc fix bug trong `bot/`: cập nhật lại danh sách lệnh (bảng tính
-  năng) trong README.md nếu danh sách slash/prefix command thay đổi.
+  năng) trong README.md, và cập nhật `FEATURE_FIELDS` trong `bot/cogs/about.py` (bảng lệnh hiện
+  trong `/aboutme`) nếu danh sách slash/prefix command thay đổi.
+- Commit message do AI tạo (`git commit`) phải viết 100% bằng tiếng Việt (vd `sửa_lỗi(ai): ...`
+  thay vì `fix(ai): ...`), khớp style hiện có trong git log.
 - Khi tạo commit: KHÔNG thêm dòng `Co-Authored-By: Claude ...` vào commit message — user muốn
   GitHub chỉ hiển thị mình họ là tác giả, không hiện đồng tác giả "claude".
+- TUYỆT ĐỐI KHÔNG chạy lệnh khởi động bot thật trên máy local của user (vd `python bot/main.py`,
+  `python main.py`) — bot đang chạy 24/7 trên Render (production), chạy thêm 1 bản ở local sẽ
+  khiến bot bị "chạy trùng" ở 2 nơi cùng lúc (xung đột kết nối Discord gateway, xung đột auto-sync
+  Storage lên GitHub). Chỉ chạy các script test độc lập (vd `test_api_key/*.py`, `py_compile`,
+  test suite trong `bot/tests/`) — không chạy chính bot.
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
   permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
   guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
@@ -57,11 +82,13 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
 Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có thay đổi (xem `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`).
 
 ### ⛔ TUYỆT ĐỐI KHÔNG được phép:
+
 - Xóa, ghi đè, hay sửa thẳng file JSON trong `bot/Storage/` — dù chỉ để test hay debug.
 - Đọc/ghi file trong thư mục này bằng `open()` thuần — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
 - Đặt file tạm, file test, file log vào đây — các file không phải dữ liệu kho sẽ làm ô nhiễm GitHub sync.
 
 ### ✅ Quy tắc khi thêm dữ liệu mới:
+
 1. File JSON mới **phải** đặt vào `bot/Storage/`.
 2. Import `STORAGE_DIR` từ `bot/core/config.py`, khai báo đường dẫn bằng `os.path.join(STORAGE_DIR, "tên_file.json")`.
 3. Đặt tên file theo pattern: `tnc_<tính_năng>_v<số_version>.json`
@@ -97,6 +124,21 @@ Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có
 - `python-reviewer` — review code Python (bảo mật, PEP8, type hint, concurrency, code quality)
 - `silent-failure-hunter` — săn lỗi nuốt exception / silent failure (vd: `except Exception: pass`)
 
+# Project-Scoped Rules
+
+## Quy tắc lưu trữ Rules/Yêu cầu mới
+Khi có yêu cầu mới, rule mới hoặc chỉ dẫn từ người dùng (User Rules/Instructions), thay vì ghi vào file `.agents/AGENTS.md`, hãy ghi trực tiếp vào file [CLAUDE.md](file:/Bot_Albion_TNC/CLAUDE.md).
+
+## Feature Documentation
+Từ nay khi user mô tả tính năng mới trong quá trình phát triển, BẮT BUỘC phải tự động lưu mô tả cơ chế hoạt động và chi tiết cách hoạt động của tính năng đó vào một file riêng (vd: `docs/features.md` hoặc một markdown file tương ứng). 
+Việc này đảm bảo dữ liệu không bị thất lạc và có thể dùng trực tiếp để đưa lên web dashboard hoặc viết tài liệu hướng dẫn sau này.
+
+## Quy tắc quản lý Script tiện ích (Helper/Hotfix)
+Khi tạo các script tiện ích, script vá lỗi (helper/hotfix/utility scripts) phát sinh trong quá trình phát triển dự án, BẮT BUỘC phải đặt chúng vào thư mục [scripts/](file:///Users/twot/Documents/CODE/Bot_Albion_TNC/scripts) thay vì thư mục gốc (root directory). Việc này giúp giữ cho thư mục gốc luôn gọn gàng và dễ dàng tìm kiếm/tham khảo các script này khi cần.
+
 ## Ngôn ngữ & xưng hô
 
-Giao tiếp bằng tiếng Việt, xưng tui/bro.
+
+Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi.
+- Tuyệt đối làm theo đúng luồng: (1) Lắng nghe ý tưởng -> (2) Phân tích 3 phương án -> (3) Đợi user chốt -> (4) Lên Implementation Plan chi tiết -> (5) Đợi chốt plan -> (6) Code.
+- Lưu ý về Implementation Plan: Mỗi khi có yêu cầu lên bảng kế hoạch (Implementation Plan), PHẢI tạo một file artifact mới hoàn toàn (ví dụ: `implementation_plan_v2.md`, `implementation_plan_featureX.md`). TUYỆT ĐỐI KHÔNG ghi đè lên bản cũ để lưu trữ lịch sử tất cả các bản plan.

@@ -140,7 +140,8 @@ class AloTtsCog(commands.Cog):
                         discord.PCMAudio(b"\x00" * 3840),  # 20ms stereo 48kHz silence
                         after=lambda e: None,
                     )
-                except Exception:
+                except Exception as e:
+                    print(f"[Error] {e}")
                     pass  # Không cần lo nếu lỗi, chỉ là keepalive
 
             await asyncio.sleep(KEEPALIVE_INTERVAL)
@@ -186,7 +187,8 @@ class AloTtsCog(commands.Cog):
             def after_play(err, path=path):
                 try:
                     os.remove(path)
-                except Exception:
+                except Exception as e:
+                    print(f"[Error] {e}")
                     pass
                 self.bot.loop.call_soon_threadsafe(finished.set)
 

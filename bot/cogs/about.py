@@ -29,9 +29,6 @@ FEATURE_FIELDS = [
     ),
     (
         "🛡️ GuildCheck",
-        "`/registertnc` (đăng ký IGN Albion)\n"
-        "`/registerfor` (đăng ký hộ member — Officer)\n"
-        "`/myign` (xem IGN đã đăng ký)\n"
         "`/guildconfig` (cấu hình GuildCheck — Officer)\n"
         "`/guildcheck` (check tay rời guild — Officer)\n"
         "`/unresolved` (xem danh sách chưa xác định — Officer)",
@@ -69,9 +66,10 @@ FEATURE_FIELDS = [
     ),
     (
         "👋 Onboarding",
-        "`/onboard setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
-        "`/onboard set_apply_channel` (chọn kênh apply — Officer)\n"
-        "`/onboard toggle` (bật/tắt tính năng Onboarding — Officer)",
+        "`/recuibot setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
+        "`/recuibot set_apply_channel` (chọn kênh apply — Officer)\n"
+        "`/recuibot setup_roles` (cài đặt role — Officer)\n"
+        "`/recuibot toggle` (bật/tắt tính năng Onboarding — Officer)",
     ),
 ]
 

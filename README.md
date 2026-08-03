@@ -1,8 +1,8 @@
 # TNC Manager — Albion Online Guild Discord Bot
 
 Discord bot quản lý guild **TNC** trong game Albion Online. Bot chính viết bằng Python
-(`discord.py`), được host online tại [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/), kèm một pnpm workspace TypeScript đang trong giai đoạn
-scaffold cho dashboard web trong tương lai.
+(`discord.py`), được host online tại [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/), kèm một dashboard web
+viết bằng Next.js trong `web_dashboard/`.
 
 ## Cấu trúc dự án
 
@@ -15,15 +15,7 @@ bot/                  Discord bot Python (thành phần chính, đang chạy pro
   cogs/               Mỗi hệ thống tính năng là 1 Cog: about, siphoned, massing, lastseen,
                       guildcheck, alo_tts, corebank
   *.json              Dữ liệu bot (điểm SP, massing, register, config...), tự backup .bak
-artifacts/
-  api-server/          Express 5 API, có route /bot/* proxy sang Flask bot (port 5000)
-  mockup-sandbox/       React app scaffold (shadcn/ui) — chưa có trang thực tế
-lib/
-  db/                    Drizzle ORM schema (PostgreSQL) — hiện còn rỗng
-  api-spec/              OpenAPI spec
-  api-zod/               Zod schema sinh từ OpenAPI
-  api-client-react/      React Query hooks sinh từ OpenAPI
-scripts/                 Script tiện ích dùng chung trong workspace
+web_dashboard/        Dashboard web Next.js (Discord OAuth2)
 ```
 
 ## Bot Discord — tính năng
@@ -31,6 +23,7 @@ scripts/                 Script tiện ích dùng chung trong workspace
 | Hệ thống | Lệnh | Mô tả |
 |---|---|---|
 | **About** | `/aboutme` | Giới thiệu bot + link trang web (embed ngắn gọn) |
+| **Onboarding** | `/recuibot setup_channels`, `/recuibot set_apply_channel`, `/recuibot setup_roles`, `/recuibot toggle` | Hệ thống Bot Thư Ký tiếp đón thành viên mới, duyệt đơn qua Forum |
 | **Siphoned Points** | `/spupdate`, `/spcheck`, `!addsp`, `!removesp`, `!removesprole`, `!resetsp` | Parse file log `.txt` để cộng dồn điểm siphoned theo người chơi, bảng xếp hạng phân trang |
 | **Massing** | `/massing`, `/masstemplatelist`, `/masstemplatedelete` | Tạo party PVP/PVE theo role/weapon, UI nút bấm (join/kick/move/fill), lưu template, tự khôi phục sau restart |
 | **GuildCheck** | `/registertnc`, `/registerfor`, `/myign`, `/guildconfig`, `/guildcheck`, `/unresolved` | Đăng ký IGN Albion, tự kiểm tra qua Albion API xem còn trong guild không, tự xóa role nếu đã rời |
@@ -108,22 +101,6 @@ Biến môi trường cần thiết (xem [bot/.env.example](bot/.env.example)):
 Bot expose Flask server tại `http://localhost:5000` (Online: [bot-albion-tnc.onrender.com](https://bot-albion-tnc.onrender.com/)):
 - `GET /` — Trang giới thiệu & trạng thái bot (HTML)
 - `GET /health` — health check
-
-## Workspace TypeScript (pnpm)
-
-```bash
-pnpm install
-pnpm run typecheck   # typecheck toàn bộ package
-pnpm run build        # typecheck + build
-```
-
-- `pnpm --filter @workspace/api-spec run codegen` — sinh lại API hooks/Zod từ OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push schema DB (chỉ dùng khi dev)
-- `pnpm --filter @workspace/api-server run dev` — chạy API server local
-
-> Phần này hiện là hạ tầng chuẩn bị cho dashboard web, đa số còn ở dạng scaffold/boilerplate
-> (schema DB rỗng, chưa có trang React thực tế). `api-server` đã có route `/bot/*` proxy
-> sang bot Python để làm cầu nối khi dashboard được xây.
 
 ## Lưu ý bảo mật
 
