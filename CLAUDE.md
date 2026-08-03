@@ -7,7 +7,7 @@ Xem [README.md](README.md) để biết tổng quan dự án, stack và cấu tr
 Khi user đề xuất tính năng mới hoặc sửa đổi code: **bàn thiết kế trước** (mô tả lệnh, logic, ảnh
 hưởng gì, file nào bị đụng) — KHÔNG viết/sửa code ngay.
 
-Chỉ viết/sửa code khi user gõ RÕ RÀNG một trong các từ xác nhận: **"chốt", "ok làm đi", "làm đi",
+Chỉ viết/sửa code khi user gõ RÕ RÀNG một trong các từ xác nhận: **"chốt", "ok", "oki", "ok làm đi", "làm đi",
 "chốt code đi"**.
 
 Các hành động sau KHÔNG tính là xác nhận: trả lời câu hỏi phụ, gửi ảnh/screenshot, cung cấp thêm
