@@ -29,10 +29,11 @@ def save_json(data, path, sync_github=True):
     """Lưu dữ liệu vào bảng json_storage trên Supabase."""
     filename = os.path.basename(path)
     try:
-        supabase.table("json_storage").upsert({
-            "file_name": filename,
-            "data": data
-        }).execute()
+        supabase.table("json_storage").upsert(
+            {"file_name": filename, "data": data},
+            on_conflict="file_name"
+        ).execute()
+        print(f"✅ [Data] Đã lưu {filename} lên Supabase.")
     except Exception as e:
         print(f"❌ [Data] Lỗi lưu {filename} lên Supabase: {e}")
 
