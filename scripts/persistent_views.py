@@ -57,7 +57,10 @@ class ApplicantConfirmView(discord.ui.View):
         await interaction.response.defer()
         
         officer_mention = f"<@&{self.cog.config.officer_role_id}>" if self.cog.config.officer_role_id else "@Officer"
-        msg_text = f"✅ Thành viên mới đã xác nhận nộp đơn ingame. Mời {officer_mention} vào xem xét duyệt nhé!"
+        msg_text = (
+            f"✅ Thành viên mới đã xác nhận nộp đơn ingame. Mời {officer_mention} vào xem xét duyệt nhé!\n"
+            "⚠️ **Lưu ý:** Thành viên đã xác nhận gửi apply ingame, Officer vui lòng kiểm tra mail apply và duyệt mail ingame trước khi bấm nút Accept"
+        )
         
         view = OfficerApprovalView(self.cog)
         await interaction.message.edit(content=msg_text, embed=embed, view=view)
@@ -69,7 +72,7 @@ class ApplicantConfirmView(discord.ui.View):
             await interaction.response.send_message("❌ Nút này chỉ dành cho người nộp đơn!", ephemeral=True)
             return
             
-        await interaction.response.send_message(f"⚠️ Bạn vui lòng vào game, tìm guild **{GUILD_NAME}** và nộp đơn apply. Sau khi apply xong thì quay lại đây bấm nút **Đã gửi apply ingame** nhé!", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ Bạn vui lòng vào game, tìm guild **{GUILD_NAME}** và nộp đơn apply. Sau khi apply xong thì quay lại đây bấm nút **Đã gửi apply ingame** nhé!", ephemeral=False)
 
 class OfficerApprovalView(discord.ui.View):
     def __init__(self, cog: 'Onboarding'):
@@ -90,20 +93,20 @@ class OfficerApprovalView(discord.ui.View):
         if member:
             role_id = self.cog.config.member_role_id
             if not role_id:
-                await interaction.followup.send("⚠️ Cảnh báo: Chưa cài đặt Member Role nên bot không thể cấp role. Dùng `/recuibot setup_roles` để cài!", ephemeral=True)
+                await interaction.followup.send("⚠️ Cảnh báo: Chưa cài đặt Member Role nên bot không thể cấp role. Dùng `/recuibot setup_roles` để cài!", ephemeral=False)
             else:
                 role = guild.get_role(int(role_id))
                 if not role:
-                    await interaction.followup.send("⚠️ Cảnh báo: Role ID đã lưu không tồn tại (có thể role đã bị xóa). Dùng `/recuibot setup_roles` để cài lại!", ephemeral=True)
+                    await interaction.followup.send("⚠️ Cảnh báo: Role ID đã lưu không tồn tại (có thể role đã bị xóa). Dùng `/recuibot setup_roles` để cài lại!", ephemeral=False)
                 else:
                     try:
                         await member.add_roles(role)
                     except discord.Forbidden:
-                        await interaction.followup.send("⚠️ Cảnh báo: Bot không có quyền cấp Role này (Role của bot đang đứng thấp hơn Role cần cấp, hoặc bot thiếu quyền Manage Roles)!", ephemeral=True)
+                        await interaction.followup.send("⚠️ Cảnh báo: Bot không có quyền cấp Role này (Role của bot đang đứng thấp hơn Role cần cấp, hoặc bot thiếu quyền Manage Roles)!", ephemeral=False)
                     except Exception as e:
-                        await interaction.followup.send(f"⚠️ Cảnh báo: Lỗi khi cấp role: {e}", ephemeral=True)
+                        await interaction.followup.send(f"⚠️ Cảnh báo: Lỗi khi cấp role: {e}", ephemeral=False)
         else:
-            await interaction.followup.send("⚠️ Cảnh báo: Không tìm thấy thành viên này trong server (có thể họ đã out).", ephemeral=True)
+            await interaction.followup.send("⚠️ Cảnh báo: Không tìm thấy thành viên này trong server (có thể họ đã out).", ephemeral=False)
         
         for child in self.children:
             if child.custom_id in ["onboard_approve", "onboard_reject"]:
@@ -157,11 +160,11 @@ class OfficerApprovalView(discord.ui.View):
             await member.edit(nick=new_nick)
             button.disabled = True
             await interaction.response.edit_message(view=self)
-            await interaction.followup.send(f"✅ Đã tự động đổi tên thành `{new_nick}`!", ephemeral=True)
+            await interaction.followup.send(f"✅ Đã tự động đổi tên thành `{new_nick}`!", ephemeral=False)
         except discord.Forbidden:
-            await interaction.response.send_message("❌ Lỗi quyền: Bot không có quyền đổi tên user này (có thể role của họ cao hơn bot hoặc bot chưa có quyền Manage Nicknames).", ephemeral=True)
+            await interaction.response.send_message("❌ Lỗi quyền: Bot không có quyền đổi tên user này (có thể role của họ cao hơn bot hoặc bot chưa có quyền Manage Nicknames).", ephemeral=False)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Có lỗi xảy ra: {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Có lỗi xảy ra: {e}", ephemeral=False)
 
     @discord.ui.button(label="Từ chối", style=discord.ButtonStyle.red, custom_id="onboard_reject")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
