@@ -470,7 +470,11 @@ class ChatAI(commands.Cog):
             "- TUYỆT ĐỐI CHỈ DÙNG TIẾNG VIỆT 100% trong toàn bộ câu trả lời.\n"
             "- KHÔNG ĐƯỢC PHÉP tự động chèn chữ ngoại ngữ vào câu nói trừ khi người dùng CỐ TÌNH yêu cầu.\n\n"
             "QUAN TRỌNG: Khi người dùng hỏi về nội dung kênh chat hoặc dữ liệu, hệ thống sẽ gửi lịch sử tin nhắn. "
-            "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Dùng dữ liệu đó để trả lời."
+            "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Dùng dữ liệu đó để trả lời.\n\n"
+            "CÔNG CỤ HỖ TRỢ (TOOL CALLING NGẦM):\n"
+            "- Nếu người dùng hỏi các thông tin cần lục lại lịch sử, tìm kiếm xem dạo này có sự kiện, content massing, hay drama gì không: BẠN BẮT BUỘC PHẢI TRẢ LỜI ĐÚNG DUY NHẤT CHUỖI NÀY: `[CALL_TOOL: search_chat_history|từ_khoá_1, từ_khoá_2]` VÀ KHÔNG IN GÌ THÊM.\n"
+            "Ví dụ: Nếu hỏi 'có content massing nào không', in ra đúng chuỗi `[CALL_TOOL: search_chat_history|massing, content]`.\n"
+            "Hệ thống sẽ tự động tìm kiếm trên toàn bộ dữ liệu máy chủ 7 ngày qua và trả kết quả để bạn tự tổng hợp."
         )
 
     async def _fetch_url_content(self, url: str) -> str:
@@ -860,8 +864,62 @@ class ChatAI(commands.Cog):
                     if result is None:
                         # Provider chưa cấu hình API Key -> bỏ qua, không tính là lỗi
                         continue
-
+                        
                     reply_text = result
+                    
+                    if reply_text and "[CALL_TOOL: search_chat_history|" in reply_text:
+                        print(f"🛠️ Kích hoạt Tool ngầm: {reply_text.strip()}")
+                        try:
+                            import re
+                            match = re.search(r'\[CALL_TOOL: search_chat_history\|(.*?)\]', reply_text)
+                            keywords_str = match.group(1) if match else ""
+                            keywords = [k.strip().lower() for k in keywords_str.split(',') if k.strip()]
+                            
+                            from core.config import SUPABASE_URL, SUPABASE_KEY
+                            from supabase import create_client
+                            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+                            
+                            res = sb.table("chat_history").select("*").order("created_at", desc=True).limit(150).execute()
+                            data = res.data
+                            
+                            filtered = []
+                            if keywords:
+                                for row in data:
+                                    content_lower = row.get("content", "").lower()
+                                    if any(kw in content_lower for kw in keywords):
+                                        filtered.append(row)
+                                filtered.extend(data[:10]) # Kẹp thêm 10 tin mới nhất để lấy context chung
+                            else:
+                                filtered = data[:30]
+                                
+                            unique_msgs = {row["id"]: row for row in filtered}
+                            final_msgs = sorted(unique_msgs.values(), key=lambda x: x.get("created_at", ""))
+                            
+                            if not final_msgs:
+                                tool_result = "[HỆ THỐNG TRẢ VỀ: Không tìm thấy lịch sử chat nào khớp với yêu cầu trong 7 ngày qua.]"
+                            else:
+                                tool_result = f"[HỆ THỐNG TRẢ VỀ: Kết quả tìm kiếm lịch sử chat toàn server]\n"
+                                for m in final_msgs:
+                                    ch_name = m.get('channel_name', 'unknown')
+                                    time_str = m.get('created_at', '')[:16].replace('T', ' ')
+                                    tool_result += f"- [Kênh: {ch_name}] {m.get('author_name')} ({time_str}): {m.get('content')}\n"
+                                    
+                            prompt += f"\n\n{tool_result}\n[HỆ THỐNG: Dựa vào lịch sử chat ở trên, hãy trả lời câu hỏi của người dùng. Nếu không có thông tin, hãy nói là không có.]"
+                            
+                            gemini_parts[0]["text"] = prompt
+                            if or_content[0]["type"] == "text":
+                                or_content[0]["text"] = prompt
+                            
+                            if provider == "gemini":
+                                reply_text = await self._call_gemini(model, step_instruction, gemini_parts, FAILOVER_STEP_TIMEOUT)
+                            elif provider == "openrouter":
+                                reply_text = await self._call_openrouter(model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
+                            else:
+                                reply_text = await self._call_ollama(model, step_instruction, prompt, FAILOVER_STEP_TIMEOUT)
+                        except Exception as e:
+                            print(f"Lỗi khi thực thi Tool search_chat_history: {e}")
+                            reply_text = "Xin lỗi, tôi không thể lấy dữ liệu lịch sử lúc này do lỗi hệ thống Database."
+
                     break
 
                 if reply_text is None:

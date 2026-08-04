@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import SearchableSelect, { Option } from "@/components/SearchableSelect";
 import { 
   LayoutDashboard, Users, Shield, 
   Swords, Gem, AlertTriangle, Package, Bot, ChevronLeft, Power, CheckCircle2, XCircle, Settings2
@@ -22,18 +23,80 @@ export default function Dashboard() {
   const { data: session } = useSession();
   const [activeModule, setActiveModule] = useState('onboarding');
   
-  // Mock Data
-  const [isOnboardEnabled, setIsOnboardEnabled] = useState(true);
+  // API Data State
+  const [isOnboardEnabled, setIsOnboardEnabled] = useState(false);
   const [config, setConfig] = useState({
-    apply_channel_id: "111122223333",
+    apply_channel_id: "",
     question_channel_id: "",
-    officer_role_id: "444455556666",
+    officer_role_id: "",
     member_role_id: ""
   });
+  const [loading, setLoading] = useState(true);
+  
+  // Discord Data
+  const [discordChannels, setDiscordChannels] = useState<Option[]>([]);
+  const [discordRoles, setDiscordRoles] = useState<Option[]>([]);
 
-  const handleConfigChange = (field: string, value: string) => {
+  // Fetch from API
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const data = await res.json();
+          setIsOnboardEnabled(data.is_onboard_enabled ?? false);
+          setConfig({
+            apply_channel_id: data.apply_channel_id || "",
+            question_channel_id: data.question_channel_id || "",
+            officer_role_id: data.officer_role_id || "",
+            member_role_id: data.member_role_id || ""
+          });
+        }
+        
+        // Fetch discord data
+        const discordRes = await fetch('/api/discord-data');
+        if (discordRes.ok) {
+           const discordData = await discordRes.json();
+           // Only keep text channels for applying/questions (type 0 or 15 etc, but we'll show all for simplicity, or just map them)
+           setDiscordChannels(discordData.channels || []);
+           setDiscordRoles(discordData.roles || []);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const handleConfigChange = async (field: string, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
+    try {
+      await fetch('/api/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value })
+      });
+    } catch (err) {
+      console.error("Lỗi lưu config:", err);
+    }
   };
+
+  const handleToggle = async () => {
+    const newVal = !isOnboardEnabled;
+    setIsOnboardEnabled(newVal);
+    try {
+      await fetch('/api/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_onboard_enabled: newVal })
+      });
+    } catch (err) {
+      console.error("Lỗi toggle config:", err);
+    }
+  };
+
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -95,7 +158,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             <span className="text-sm font-semibold text-text-muted">Trạng thái Module:</span>
             <button
-              onClick={() => setIsOnboardEnabled(!isOnboardEnabled)}
+              onClick={handleToggle}
               className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none ${
                 isOnboardEnabled ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-surface'
               }`}
@@ -146,15 +209,12 @@ export default function Dashboard() {
                       <p className="text-sm font-medium mt-2">Kênh nộp đơn (Channel muốn bot hoạt động)</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <select 
+                      <SearchableSelect 
+                        options={discordChannels}
                         value={config.apply_channel_id}
-                        onChange={(e) => handleConfigChange('apply_channel_id', e.target.value)}
-                        className="flex-1 bg-surface border border-border text-sm rounded-lg px-3 py-2 text-white outline-none focus:border-primary"
-                      >
-                        <option value="">-- Chọn Channel --</option>
-                        <option value="111122223333">#apply-guild</option>
-                        <option value="123456789">#welcome</option>
-                      </select>
+                        onChange={(val) => handleConfigChange('apply_channel_id', val)}
+                        placeholder="-- Chọn Kênh Nộp Đơn --"
+                      />
                     </div>
                   </div>
 
@@ -165,14 +225,12 @@ export default function Dashboard() {
                       <p className="text-sm font-medium mt-2">Kênh gửi câu hỏi / phỏng vấn</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <select 
+                      <SearchableSelect 
+                        options={discordChannels}
                         value={config.question_channel_id}
-                        onChange={(e) => handleConfigChange('question_channel_id', e.target.value)}
-                        className="flex-1 bg-surface border border-border text-sm rounded-lg px-3 py-2 text-white outline-none focus:border-primary"
-                      >
-                        <option value="">-- Chọn Channel --</option>
-                        <option value="987654321">#phong-van</option>
-                      </select>
+                        onChange={(val) => handleConfigChange('question_channel_id', val)}
+                        placeholder="-- Chọn Kênh Phỏng Vấn --"
+                      />
                     </div>
                   </div>
                   
@@ -183,22 +241,20 @@ export default function Dashboard() {
                       <p className="text-sm font-medium mt-2">Cấu hình Roles nhận được</p>
                     </div>
                     <div className="space-y-3">
-                      <select 
+                      <SearchableSelect 
+                        options={discordRoles}
                         value={config.officer_role_id}
-                        onChange={(e) => handleConfigChange('officer_role_id', e.target.value)}
-                        className="w-full bg-surface border border-border text-sm rounded-lg px-3 py-2 text-white outline-none focus:border-primary"
-                      >
-                        <option value="">-- Chọn Officer Role --</option>
-                        <option value="444455556666">@Officer</option>
-                      </select>
-                      <select 
+                        onChange={(val) => handleConfigChange('officer_role_id', val)}
+                        placeholder="-- Chọn Officer Role --"
+                        isRole={true}
+                      />
+                      <SearchableSelect 
+                        options={discordRoles}
                         value={config.member_role_id}
-                        onChange={(e) => handleConfigChange('member_role_id', e.target.value)}
-                        className="w-full bg-surface border border-border text-sm rounded-lg px-3 py-2 text-white outline-none focus:border-primary"
-                      >
-                        <option value="">-- Chọn Member Role --</option>
-                        <option value="999988887777">@Member</option>
-                      </select>
+                        onChange={(val) => handleConfigChange('member_role_id', val)}
+                        placeholder="-- Chọn Member Role --"
+                        isRole={true}
+                      />
                     </div>
                   </div>
 
