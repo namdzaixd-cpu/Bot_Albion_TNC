@@ -19,7 +19,7 @@ CORE_CREDITED_FILE = os.path.join(STORAGE_DIR, "tnc_core_credited_v1.json")
 
 
 def load_coreconfig():
-    return load_json(CORECONFIG_FILE, lambda: {"core_channel_id": "", "bank_channel_id": "", "unbelievaboat_token": "", "emoji_map": {}})
+    return load_json(CORECONFIG_FILE, lambda: {"core_channel_id": "", "bank_channel_id": "", "unbelievaboat_token": "", "emoji_map": {}, "auto_react": True})
 
 
 def save_coreconfig(data):
@@ -64,7 +64,7 @@ class CoreBankCog(commands.Cog):
             return
         try:
             core_config = load_coreconfig()
-            if core_config.get("auto_react", False):
+            if core_config.get("auto_react", True):
                 core_ch_id = core_config.get("core_channel_id")
                 is_core = str(message.channel.id) == core_ch_id
                 if not is_core and hasattr(message.channel, "parent_id"):
@@ -123,55 +123,78 @@ class CoreBankCog(commands.Cog):
 
     # ── Lệnh cấu hình ────────────────────────────────────────────────────────
 
-    @app_commands.command(name="coresetup", description="Cài đặt kênh cho hệ thống Core-Bank (Officer only)")
+    @app_commands.command(name="coresetup", description="Cài đặt kênh và API Token cho hệ thống Core-Bank (Officer only)")
     @app_commands.describe(
         core_channel="Kênh #core-vortex hoặc Diễn đàn nơi member đăng ảnh",
-        bank_channel="Kênh bot gửi lệnh !add-money / !remove-money cho UnbelievaBoat"
+        bank_channel="Kênh bot gửi lệnh !add-money / !remove-money cho UnbelievaBoat",
+        token="API Token lấy từ trang chủ UnbelievaBoat"
     )
     async def coresetup_cmd(self, interaction: discord.Interaction,
                              core_channel: discord.abc.GuildChannel,
-                             bank_channel: discord.abc.GuildChannel):
+                             bank_channel: discord.abc.GuildChannel,
+                             token: str):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
         config = load_coreconfig()
         config["core_channel_id"] = str(core_channel.id)
         config["bank_channel_id"] = str(bank_channel.id)
+        config["unbelievaboat_token"] = token
         save_coreconfig(config)
         await interaction.response.send_message(
             f"✅ Đã cài đặt Core-Bank:\n"
             f"📸 Core channel: {core_channel.mention}\n"
-            f"💰 Bank channel: {bank_channel.mention}",
+            f"💰 Bank channel: {bank_channel.mention}\n"
+            f"🔑 UnbelievaBoat Token: **Đã cài ✅**",
             ephemeral=True
         )
 
-    @app_commands.command(name="coretoken", description="Cài đặt API Token của UnbelievaBoat (Officer only)")
-    @app_commands.describe(token="API Token lấy từ trang chủ UnbelievaBoat")
-    async def coretoken_cmd(self, interaction: discord.Interaction, token: str):
-        if not is_officer(interaction.user):
-            return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
-        config = load_coreconfig()
-        config["unbelievaboat_token"] = token
-        save_coreconfig(config)
-        await interaction.response.send_message("✅ Đã cài đặt UnbelievaBoat API Token thành công!", ephemeral=True)
-
-    @app_commands.command(name="coreadd", description="Thêm emoji Core với tên và giá trị silver tuỳ ý (Officer only)")
+    @app_commands.command(name="coreadd", description="Thêm emoji Core (hỗ trợ nhiều cùng lúc, phân cách bằng dấu phẩy) (Officer only)")
     @app_commands.describe(
-        emoji="Emoji đại diện (unicode hoặc emoji server, vd: 🟢 hay <:ten:id>)",
-        name="Tên Core (vd: Green Core, Xanh Lá...)",
-        value="Giá trị silver tương ứng",
-        order="Số thứ tự hiển thị (tùy chọn, mặc định 0)"
+        emoji="Emoji đại diện, phân cách bằng phẩy (vd: 🟢,🔵 hoặc <:a:123>,<:b:456>)",
+        name="Tên Core, phân cách bằng phẩy (vd: Green Core,Blue Core)",
+        value="Giá trị silver, phân cách bằng phẩy (vd: 100000,200000)",
+        order="Số thứ tự hiển thị, phân cách bằng phẩy (tùy chọn, mặc định 0)"
     )
-    async def coreadd_cmd(self, interaction: discord.Interaction, emoji: str, name: str, value: int, order: int = 0):
+    async def coreadd_cmd(self, interaction: discord.Interaction, emoji: str, name: str, value: str, order: str = ""):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
-        if value <= 0:
-            return await interaction.response.send_message("⚠️ Giá trị silver phải > 0!", ephemeral=True)
-        key, display = parse_emoji_input(emoji)
+
+        emojis = [e.strip() for e in emoji.split(",")]
+        names  = [n.strip() for n in name.split(",")]
+        values = [v.strip() for v in value.split(",")]
+        orders = [o.strip() for o in order.split(",")] if order.strip() else []
+
+        count = len(emojis)
+        if len(names) != count or len(values) != count:
+            return await interaction.response.send_message(
+                "⚠️ Số lượng emoji, tên và giá trị phải bằng nhau!\n"
+                "Ví dụ: `/coreadd 🟢,🔵 Green Core,Blue Core 100000,200000`",
+                ephemeral=True
+            )
+
         config = load_coreconfig()
-        config.setdefault("emoji_map", {})[key] = {"name": name, "value": value, "display": display, "order": order}
-        save_coreconfig(config)
+        results, errors = [], []
+
+        for i in range(count):
+            try:
+                v = int(values[i].replace(".", "").replace(",", ""))
+                if v <= 0:
+                    errors.append(f"❌ `{names[i]}`: giá trị phải > 0")
+                    continue
+                o = int(orders[i]) if i < len(orders) and orders[i] else 0
+                key, display = parse_emoji_input(emojis[i])
+                config.setdefault("emoji_map", {})[key] = {"name": names[i], "value": v, "display": display, "order": o}
+                results.append(f"✅ {display} **{names[i]}** — {v:,} silver (STT: {o})")
+            except ValueError:
+                errors.append(f"❌ `{values[i]}`: giá trị không hợp lệ")
+
+        if results:
+            save_coreconfig(config)
+
+        lines = results + errors
+        msg = "\n".join(lines) if lines else "⚠️ Không có gì được thêm."
         await interaction.response.send_message(
-            f"✅ Đã thêm: {display} = **{name}** = **{value:,} silver** (STT: {order})",
+            f"📋 Kết quả thêm Core ({len(results)}/{count} thành công):\n{msg}",
             ephemeral=True
         )
 
@@ -210,7 +233,7 @@ class CoreBankCog(commands.Cog):
         core_ch = config.get("core_channel_id")
         bank_ch = config.get("bank_channel_id")
         token = config.get("unbelievaboat_token", "")
-        auto_react = config.get("auto_react", False)
+        auto_react = config.get("auto_react", True)
 
         embed = discord.Embed(title="⚙️ Cấu hình Core-Bank", color=0xf1c40f)
         embed.add_field(
