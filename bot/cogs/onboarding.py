@@ -115,8 +115,12 @@ class RulesConfirmView(discord.ui.View):
             f"Sau khi nộp xong ingame, hãy bấm nút **Đã gửi apply ingame** bên dưới để gọi Officer vào duyệt nhé!"
         )
         
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+        
         view = ApplicantConfirmView(self.cog)
-        await interaction.message.edit(content=msg_text, embed=embed, view=view)
+        await interaction.channel.send(content=msg_text, embed=embed, view=view)
 
 class ApplicantConfirmView(discord.ui.View):
     def __init__(self, cog: 'Onboarding'):
@@ -138,8 +142,12 @@ class ApplicantConfirmView(discord.ui.View):
             "⚠️ **Lưu ý:** Thành viên đã xác nhận gửi apply ingame, Officer vui lòng kiểm tra mail apply và duyệt mail ingame trước khi bấm nút Accept"
         )
         
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+        
         view = OfficerApprovalView(self.cog)
-        await interaction.message.edit(content=msg_text, embed=embed, view=view)
+        await interaction.channel.send(content=msg_text, embed=embed, view=view)
 
     @discord.ui.button(label="Chưa gửi apply ingame", style=discord.ButtonStyle.secondary, custom_id="onboard_applicant_not_done")
     async def not_done(self, interaction: discord.Interaction, button: discord.ui.Button):
