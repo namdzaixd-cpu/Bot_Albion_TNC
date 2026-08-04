@@ -152,7 +152,7 @@ class OfficerApprovalView(discord.ui.View):
         super().__init__(timeout=None)
         self.cog = cog
 
-    @discord.ui.button(label="Duyệt Đơn", style=discord.ButtonStyle.green, custom_id="onboard_approve")
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.green, custom_id="onboard_approve")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         from core.permissions import is_officer
         if not is_officer(interaction.user):
@@ -203,7 +203,7 @@ class OfficerApprovalView(discord.ui.View):
         )
         await interaction.channel.send(welcome_msg)
 
-    @discord.ui.button(label="Đổi tên new member", style=discord.ButtonStyle.primary, custom_id="onboard_rename")
+    @discord.ui.button(label="Rename", style=discord.ButtonStyle.primary, custom_id="onboard_rename")
     async def rename_member(self, interaction: discord.Interaction, button: discord.ui.Button):
         from core.permissions import is_officer
         if not is_officer(interaction.user):
