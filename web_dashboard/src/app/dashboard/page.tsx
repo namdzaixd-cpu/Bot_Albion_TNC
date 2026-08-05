@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [config, setConfig] = useState({
     apply_channel_id: "",
     question_channel_id: "",
+    rules_channel_id: "",
+    chat_channel_id: "",
     officer_role_id: "",
     member_role_id: ""
   });
@@ -48,6 +50,8 @@ export default function Dashboard() {
           setConfig({
             apply_channel_id: data.apply_channel_id || "",
             question_channel_id: data.question_channel_id || "",
+            rules_channel_id: data.rules_channel_id || "",
+            chat_channel_id: data.chat_channel_id || "",
             officer_role_id: data.officer_role_id || "",
             member_role_id: data.member_role_id || ""
           });
@@ -222,14 +226,26 @@ export default function Dashboard() {
                   <div className="glass-panel p-5 rounded-xl space-y-4 hover:border-primary/50 transition-colors">
                     <div>
                       <code className="text-primary font-mono text-xs bg-primary/10 px-2 py-1 rounded">/recuibot setup_channels</code>
-                      <p className="text-sm font-medium mt-2">Kênh gửi câu hỏi / phỏng vấn</p>
+                      <p className="text-sm font-medium mt-2">Cấu hình bộ 3 kênh tiếp đón</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="space-y-3">
+                      <SearchableSelect 
+                        options={discordChannels}
+                        value={config.rules_channel_id}
+                        onChange={(val) => handleConfigChange('rules_channel_id', val)}
+                        placeholder="-- Chọn Kênh Luật Lệ (Rules) --"
+                      />
+                      <SearchableSelect 
+                        options={discordChannels}
+                        value={config.chat_channel_id}
+                        onChange={(val) => handleConfigChange('chat_channel_id', val)}
+                        placeholder="-- Chọn Kênh Trò Chuyện (Guild Chat) --"
+                      />
                       <SearchableSelect 
                         options={discordChannels}
                         value={config.question_channel_id}
                         onChange={(val) => handleConfigChange('question_channel_id', val)}
-                        placeholder="-- Chọn Kênh Phỏng Vấn --"
+                        placeholder="-- Chọn Kênh Phỏng Vấn (Hỏi Đáp) --"
                       />
                     </div>
                   </div>

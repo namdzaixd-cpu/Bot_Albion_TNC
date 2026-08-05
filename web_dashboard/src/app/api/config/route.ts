@@ -53,6 +53,18 @@ export async function PATCH(request: Request) {
 
     if (error) throw error;
 
+    // Trigger webhook để bot discord load lại config
+    if (process.env.BOT_WEBHOOK_URL) {
+      try {
+        fetch(process.env.BOT_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch(e => console.error("Không thể trigger webhook:", e));
+      } catch (e) {
+        console.error("Lỗi khi gửi webhook:", e);
+      }
+    }
+
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("Lỗi cập nhật config:", error.message);

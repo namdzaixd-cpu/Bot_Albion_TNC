@@ -22,6 +22,8 @@ EXTENSIONS = [
     "cogs.chat_ai",
     "cogs.onboarding",
     "cogs.wiki",
+    "cogs.chat_logger",
+    "cogs.sync",
 ]
 
 
@@ -53,5 +55,5 @@ async def on_ready():
 
 
 if __name__ == "__main__":
-    keep_alive()
+    keep_alive(bot)
     bot.run(TOKEN)

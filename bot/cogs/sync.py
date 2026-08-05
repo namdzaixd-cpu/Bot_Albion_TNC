@@ -61,6 +61,12 @@ class Sync(commands.Cog):
         print("🔄 Đang đồng bộ Channels và Roles lên Supabase...")
         guild = self.bot.get_guild(int(GUILD_ID))
         if guild:
+            # Upsert Guild Config trước để tránh lỗi Foreign Key
+            try:
+                supabase.table("guild_config").upsert({"guild_id": str(guild.id)}, on_conflict="guild_id").execute()
+            except Exception as e:
+                print(f"Lỗi khi tạo guild_config trong sync: {e}")
+                
             # Sync channels
             for channel in guild.channels:
                 await self._upsert_channel(channel)

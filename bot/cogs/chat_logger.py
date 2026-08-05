@@ -3,7 +3,6 @@ from discord.ext import commands, tasks
 from core.config import SUPABASE_URL, SUPABASE_KEY
 from supabase import create_client
 import datetime
-import pytz
 
 supabase = None
 if SUPABASE_URL and SUPABASE_KEY:
@@ -15,6 +14,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 class ChatLogger(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.known_channels = set()
         self.cleanup_old_messages.start()
 
     def cog_unload(self):
@@ -36,12 +36,40 @@ class ChatLogger(commands.Cog):
         if not supabase: 
             return
 
+        if not message.guild:
+            return
+
         try:
+            guild_id = str(message.guild.id)
+            channel_id = str(message.channel.id)
+            
+            # Upsert guild and channel if not cached
+            if channel_id not in self.known_channels:
+                try:
+                    # Upsert Guild Config (to ensure FK is valid)
+                    supabase.table("guild_config").upsert(
+                        {"guild_id": guild_id}, 
+                        on_conflict="guild_id"
+                    ).execute()
+                    
+                    # Upsert Discord Channels (to ensure FK is valid)
+                    supabase.table("discord_channels").upsert({
+                        "id": channel_id,
+                        "guild_id": guild_id,
+                        "name": getattr(message.channel, "name", "unknown"),
+                        "type": str(getattr(message.channel, "type", "text"))
+                    }, on_conflict="id").execute()
+                    
+                    self.known_channels.add(channel_id)
+                except Exception as e:
+                    print(f"Lỗi khi Upsert Channel/Guild trong chat_logger: {e}")
+                    return # Ngừng log tin nhắn này nếu không gán được channel
+
             data = {
                 "id": str(message.id),
                 "user_id": str(message.author.id),
                 "author_name": message.author.display_name,
-                "channel_id": str(message.channel.id),
+                "channel_id": channel_id,
                 "channel_name": getattr(message.channel, "name", "unknown"),
                 "content": message.content,
                 "created_at": message.created_at.isoformat()

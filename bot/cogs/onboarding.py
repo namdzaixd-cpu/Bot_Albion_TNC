@@ -9,6 +9,8 @@ from discord.ext import commands
 from core.config import STORAGE_DIR, GUILD_NAME, GUILD_TAG, GUILD_ID, SUPABASE_URL, SUPABASE_KEY
 from core.storage import load_json, save_json
 from core.permissions import is_officer
+from supabase import create_client
+
 supabase = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -437,7 +439,11 @@ class Onboarding(commands.Cog):
         if message.attachments or "http" in message.content:
             await self.process_apply_thread(message.channel)
 
-
+    @commands.Cog.listener()
+    async def on_config_reload(self):
+        # Triggered by webhook to reload config from Supabase
+        self.config = OnboardConfig()
+        print("✅ Đã tự động cập nhật cấu hình Onboarding từ Dashboard!")
     onboard_group = app_commands.Group(name="recuibot", description="Hệ thống Bot Thư Ký duyệt đơn")
 
     @onboard_group.command(name="toggle", description="Bật/Tắt chế độ Thư Ký tự động")
