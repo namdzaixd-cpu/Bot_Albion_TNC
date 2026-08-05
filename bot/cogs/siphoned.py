@@ -7,23 +7,62 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import STORAGE_DIR
 from core.permissions import is_officer
-from core.storage import load_json, save_json
+from core.database import supabase
 
 # ==============================================================================
 # HỆ THỐNG PHÂN TÍCH ĐIỂM SIPHONED (LOG ANALYZER)
 # ==============================================================================
-SIPHONED_FILE = os.path.join(STORAGE_DIR, "tnc_sp_v32.json")
-
 
 def load_sp():
-    return load_json(SIPHONED_FILE, lambda: {"history": {}, "last_update": "Chưa có dữ liệu"})
-
+    data = {"history": {}, "last_update": "Chưa có dữ liệu"}
+    try:
+        # Load metadata
+        meta_resp = supabase.table("sp_metadata").select("last_update").eq("id", 1).execute()
+        if meta_resp.data:
+            data["last_update"] = meta_resp.data[0]["last_update"]
+        
+        # Load history
+        history_resp = supabase.table("user_economy").select("user_id, silver_pieces").execute()
+        if history_resp.data:
+            for row in history_resp.data:
+                data["history"][row["user_id"]] = row["silver_pieces"]
+    except Exception as e:
+        print(f"Error loading SP from Supabase: {e}")
+    return data
 
 def save_sp(data):
-    save_json(data, SIPHONED_FILE)
+    try:
+        # Save metadata
+        supabase.table("sp_metadata").upsert({"id": 1, "last_update": data.get("last_update", "N/A")}).execute()
+        
+        # Save history
+        records = [{"user_id": user, "silver_pieces": sp} for user, sp in data.get("history", {}).items()]
+        
+        if records:
+            chunk_size = 1000
+            for i in range(0, len(records), chunk_size):
+                chunk = records[i:i+chunk_size]
+                supabase.table("user_economy").upsert(chunk).execute()
+    except Exception as e:
+        print(f"Error saving SP to Supabase: {e}")
 
+def delete_sp_user(user_id):
+    try:
+        supabase.table("user_economy").delete().eq("user_id", user_id).execute()
+    except Exception as e:
+        print(f"Error deleting user {user_id} from Supabase: {e}")
+
+def reset_sp_history():
+    try:
+        # Warning: This clears the whole table
+        # We can't do delete without filter in supabase python easily, so we just select all and delete in chunks or just one by one, 
+        # or it's better to just delete using a filter that matches all.
+        # But actually in supabase we can do delete().neq("user_id", "nothing")
+        supabase.table("user_economy").delete().neq("user_id", "").execute()
+        supabase.table("sp_metadata").upsert({"id": 1, "last_update": "N/A"}).execute()
+    except Exception as e:
+        print(f"Error resetting SP history: {e}")
 
 class SiphonedPaginator(discord.ui.View):
     def __init__(self, data, last_update):
@@ -128,7 +167,7 @@ class SiphonedCog(commands.Cog):
                     continue
 
         save_sp(data)
-        await interaction.followup.send(f"✅ Xử lý thành công **{count}** dòng dữ liệu log.\nMốc log: `{data['last_update']}` (Đã Sync GitHub!)")
+        await interaction.followup.send(f"✅ Xử lý thành công **{count}** dòng dữ liệu log.\nMốc log: `{data['last_update']}` (Đã lưu lên Supabase)")
 
     @app_commands.command(name="spcheck", description="Xem bảng xếp hạng tích lũy điểm Siphoned")
     async def spcheck(self, interaction: discord.Interaction):
@@ -170,8 +209,7 @@ class SiphonedCog(commands.Cog):
             return await ctx.send("❌ Bạn không có quyền!")
         data = load_sp()
         if name in data["history"]:
-            del data["history"][name]
-            save_sp(data)
+            delete_sp_user(name)
             await ctx.send(f"🧹 Đã xóa hoàn toàn thành viên **{name}** ra khỏi bảng xếp hạng Siphoned.")
         else:
             await ctx.send(f"❓ Không tìm thấy thành viên `{name}`.")
@@ -188,7 +226,7 @@ class SiphonedCog(commands.Cog):
         try:
             msg = await self.bot.wait_for('message', check=check, timeout=15.0)
             if msg.content.lower() == 'yes':
-                save_sp({"history": {}, "last_update": "N/A"})
+                reset_sp_history()
                 await ctx.send("🧹 Toàn bộ bảng xếp hạng điểm Siphoned đã được reset!")
         except asyncio.TimeoutError:
             pass
@@ -196,3 +234,4 @@ class SiphonedCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(SiphonedCog(bot))
+

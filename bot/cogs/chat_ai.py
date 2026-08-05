@@ -21,7 +21,9 @@ from discord.ext import commands
 
 from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KEY, OLLAMA_API_KEY
 from core.permissions import is_officer
+from core.permissions import is_officer
 from core.storage import load_json, save_json
+from core.database import supabase
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OLLAMA_URL = "https://ollama.com/api/chat"
@@ -68,15 +70,27 @@ class ChatAI(commands.Cog):
             self.message_buffers[channel_id_str] = collections.deque(maxlen=size)
         return self.message_buffers[channel_id_str]
         
+    def _save_ai_config(self):
+        try:
+            self.ai_config["guild_id"] = "default"
+            supabase.table("ai_config").upsert(self.ai_config).execute()
+        except Exception as e:
+            print(f"Error saving ai_config: {e}")
+
     def _reload_config(self):
-        self.ai_config_file = os.path.join(STORAGE_DIR, "tnc_ai_config.json")
-        self.ai_config = load_json(self.ai_config_file, dict)
-        if "channel_buffers" not in self.ai_config:
-            self.ai_config["channel_buffers"] = {}
-        if "intercept_channels" not in self.ai_config:
-            self.ai_config["intercept_channels"] = []
-        if "autowiki_channels" not in self.ai_config:
-            self.ai_config["autowiki_channels"] = []
+        self.ai_config = {
+            "channel_buffers": {}, 
+            "intercept_channels": [], 
+            "library_channel_ids": [],
+            "vision_channels": [], 
+            "model": "inclusionai/ling-3.0-flash:free"
+        }
+        try:
+            resp = supabase.table("ai_config").select("*").eq("guild_id", "default").execute()
+            if resp.data:
+                self.ai_config.update(resp.data[0])
+        except Exception as e:
+            print(f"Error loading ai_config from Supabase: {e}")
             
         self.library_file = os.path.join(STORAGE_DIR, "tnc_library_v1.json")
         self.library_data = load_json(self.library_file, list)
@@ -169,7 +183,7 @@ class ChatAI(commands.Cog):
             
         channel_id = str(interaction.channel_id)
         self.ai_config["channel_buffers"][channel_id] = size
-        save_json(self.ai_config, self.ai_config_file)
+        self._save_ai_config()
         
         # Reset buffer for this channel
         self.message_buffers[channel_id] = collections.deque(maxlen=size)
@@ -195,13 +209,13 @@ class ChatAI(commands.Cog):
             if channel_id not in intercepts:
                 intercepts.append(channel_id)
                 self.ai_config["intercept_channels"] = intercepts
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **BẬT** tính năng hóng hớt (Nói leo ngẫu nhiên 2%) cho kênh này.", ephemeral=False)
         else:
             if channel_id in intercepts:
                 intercepts.remove(channel_id)
                 self.ai_config["intercept_channels"] = intercepts
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **TẮT** tính năng hóng hớt tự động cho kênh này.", ephemeral=False)
 
     async def _image_to_base64(self, url: str) -> str:
@@ -277,12 +291,12 @@ class ChatAI(commands.Cog):
         if channel_id in library_ids:
             library_ids.remove(channel_id)
             self.ai_config["library_channel_ids"] = library_ids
-            save_json(self.ai_config, self.ai_config_file)
+            self._save_ai_config()
             await interaction.response.send_message(f"✅ Đã **BỎ** kênh <#{channel_id}> khỏi danh sách Thư viện.", ephemeral=False)
         else:
             library_ids.append(channel_id)
             self.ai_config["library_channel_ids"] = library_ids
-            save_json(self.ai_config, self.ai_config_file)
+            self._save_ai_config()
             await interaction.response.send_message(f"✅ Đã **THÊM** kênh <#{channel_id}> vào danh sách Thư viện. Dùng `/aimodel library_scan` để quét dữ liệu.", ephemeral=False)
 
     async def _process_msg_for_docs(self, msg: discord.Message, title: str, docs: list):
@@ -367,34 +381,6 @@ class ChatAI(commands.Cog):
         save_json(self.library_data, self.library_file)
         await interaction.response.send_message("✅ Đã xóa toàn bộ kiến thức trong Thư viện Nội bộ.", ephemeral=False)
 
-    @ailibrary_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
-    @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
-    @app_commands.choices(state=[
-        app_commands.Choice(name="Bật (On)", value="on"),
-        app_commands.Choice(name="Tắt (Off)", value="off")
-    ])
-    async def aimodel_autowiki(self, interaction: discord.Interaction, state: str):
-        self._reload_config()
-        if not is_officer(interaction.user):
-            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
-            return
-            
-        channel_id = str(interaction.channel_id)
-        autowiki = self.ai_config.get("autowiki_channels", [])
-        
-        if state == "on":
-            if channel_id not in autowiki:
-                autowiki.append(channel_id)
-                self.ai_config["autowiki_channels"] = autowiki
-                save_json(self.ai_config, self.ai_config_file)
-            await interaction.response.send_message("✅ Đã **BẬT** tính năng Tự động tra cứu Wiki cho kênh này. Bot sẽ thông minh hơn nhưng phản hồi chậm đi 1-2 giây.", ephemeral=False)
-        else:
-            if channel_id in autowiki:
-                autowiki.remove(channel_id)
-                self.ai_config["autowiki_channels"] = autowiki
-                save_json(self.ai_config, self.ai_config_file)
-            await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
-
     @aichat_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
     @app_commands.choices(state=[
@@ -414,13 +400,13 @@ class ChatAI(commands.Cog):
             if channel_id not in vision_channels:
                 vision_channels.append(channel_id)
                 self.ai_config["vision_channels"] = vision_channels
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **BẬT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này. Lưu ý: có thể tốn token API.", ephemeral=False)
         else:
             if channel_id in vision_channels:
                 vision_channels.remove(channel_id)
                 self.ai_config["vision_channels"] = vision_channels
-                save_json(self.ai_config, self.ai_config_file)
+                self._save_ai_config()
             await interaction.response.send_message("✅ Đã **TẮT** tính năng Nhãn Thuật (Đọc Ảnh) cho kênh này.", ephemeral=False)
 
     def _get_default_instruction(self) -> str:
@@ -455,7 +441,11 @@ class ChatAI(commands.Cog):
             "- TUYỆT ĐỐI CHỈ DÙNG TIẾNG VIỆT 100% trong toàn bộ câu trả lời.\n"
             "- KHÔNG ĐƯỢC PHÉP tự động chèn chữ ngoại ngữ vào câu nói trừ khi người dùng CỐ TÌNH yêu cầu.\n\n"
             "QUAN TRỌNG: Khi người dùng hỏi về nội dung kênh chat hoặc dữ liệu, hệ thống sẽ gửi lịch sử tin nhắn. "
-            "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Dùng dữ liệu đó để trả lời."
+            "BẠN ĐÃ CÓ DỮ LIỆU NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỪ CHỐI với lý do 'không có quyền truy cập' hay 'chính sách bảo mật'. Dùng dữ liệu đó để trả lời.\n\n"
+            "CÔNG CỤ HỖ TRỢ (TOOL CALLING NGẦM):\n"
+            "- Nếu người dùng hỏi các thông tin cần lục lại lịch sử, tìm kiếm xem dạo này có sự kiện, content massing, hay drama gì không: BẠN BẮT BUỘC PHẢI TRẢ LỜI ĐÚNG DUY NHẤT CHUỖI NÀY: `[CALL_TOOL: search_chat_history|từ_khoá_1, từ_khoá_2]` VÀ KHÔNG IN GÌ THÊM.\n"
+            "Ví dụ: Nếu hỏi 'có content massing nào không', in ra đúng chuỗi `[CALL_TOOL: search_chat_history|massing, content]`.\n"
+            "Hệ thống sẽ tự động tìm kiếm trên toàn bộ dữ liệu máy chủ 7 ngày qua và trả kết quả để bạn tự tổng hợp."
         )
 
     async def _fetch_url_content(self, url: str) -> str:
@@ -645,16 +635,6 @@ class ChatAI(commands.Cog):
         channel_mentions = re.findall(r'<#(\d+)>', content)
         link_mentions = re.findall(r'discord\.com/channels/\d+/(\d+)', content)
         
-        # Auto Wiki Search
-        wiki_context = ""
-        autowiki = self.ai_config.get("autowiki_channels", [])
-        if channel_id_str in autowiki and is_mentioned and not is_random_intercept:
-            question_keywords = ["là gì", "thế nào", "cách", "hướng dẫn", "tác dụng", "cơ chế", "chỉ số", "chiêu", "skill", "item", "vũ khí", "áo", "mũ", "giày", "?", "wiki", "tìm hiểu", "cho hỏi", "dùng để"]
-            if any(kw in content_lower for kw in question_keywords):
-                await message.channel.typing()
-                wiki_data = await self._search_wiki_async(content)
-                wiki_context = f"--- Dữ liệu tra cứu tự động từ Albion Wiki ---\n{wiki_data}\n--------------------------------------\n\n"
-        
         # Thư viện nội bộ RAG
         library_context = ""
         if self.library_data:
@@ -784,8 +764,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context or web_context or wiki_context or library_context:
-            prompt = guild_info + context_data + reply_context + library_context + web_context + wiki_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context or library_context:
+            prompt = guild_info + context_data + reply_context + library_context + web_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             
@@ -845,8 +825,62 @@ class ChatAI(commands.Cog):
                     if result is None:
                         # Provider chưa cấu hình API Key -> bỏ qua, không tính là lỗi
                         continue
-
+                        
                     reply_text = result
+                    
+                    if reply_text and "[CALL_TOOL: search_chat_history|" in reply_text:
+                        print(f"🛠️ Kích hoạt Tool ngầm: {reply_text.strip()}")
+                        try:
+                            import re
+                            match = re.search(r'\[CALL_TOOL: search_chat_history\|(.*?)\]', reply_text)
+                            keywords_str = match.group(1) if match else ""
+                            keywords = [k.strip().lower() for k in keywords_str.split(',') if k.strip()]
+                            
+                            from core.config import SUPABASE_URL, SUPABASE_KEY
+                            from supabase import create_client
+                            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+                            
+                            res = sb.table("chat_history").select("*").order("created_at", desc=True).limit(150).execute()
+                            data = res.data
+                            
+                            filtered = []
+                            if keywords:
+                                for row in data:
+                                    content_lower = row.get("content", "").lower()
+                                    if any(kw in content_lower for kw in keywords):
+                                        filtered.append(row)
+                                filtered.extend(data[:10]) # Kẹp thêm 10 tin mới nhất để lấy context chung
+                            else:
+                                filtered = data[:30]
+                                
+                            unique_msgs = {row["id"]: row for row in filtered}
+                            final_msgs = sorted(unique_msgs.values(), key=lambda x: x.get("created_at", ""))
+                            
+                            if not final_msgs:
+                                tool_result = "[HỆ THỐNG TRẢ VỀ: Không tìm thấy lịch sử chat nào khớp với yêu cầu trong 7 ngày qua.]"
+                            else:
+                                tool_result = f"[HỆ THỐNG TRẢ VỀ: Kết quả tìm kiếm lịch sử chat toàn server]\n"
+                                for m in final_msgs:
+                                    ch_name = m.get('channel_name', 'unknown')
+                                    time_str = m.get('created_at', '')[:16].replace('T', ' ')
+                                    tool_result += f"- [Kênh: {ch_name}] {m.get('author_name')} ({time_str}): {m.get('content')}\n"
+                                    
+                            prompt += f"\n\n{tool_result}\n[HỆ THỐNG: Dựa vào lịch sử chat ở trên, hãy trả lời câu hỏi của người dùng. Nếu không có thông tin, hãy nói là không có.]"
+                            
+                            gemini_parts[0]["text"] = prompt
+                            if or_content[0]["type"] == "text":
+                                or_content[0]["text"] = prompt
+                            
+                            if provider == "gemini":
+                                reply_text = await self._call_gemini(model, step_instruction, gemini_parts, FAILOVER_STEP_TIMEOUT)
+                            elif provider == "openrouter":
+                                reply_text = await self._call_openrouter(model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
+                            else:
+                                reply_text = await self._call_ollama(model, step_instruction, prompt, FAILOVER_STEP_TIMEOUT)
+                        except Exception as e:
+                            print(f"Lỗi khi thực thi Tool search_chat_history: {e}")
+                            reply_text = "Xin lỗi, tôi không thể lấy dữ liệu lịch sử lúc này do lỗi hệ thống Database."
+
                     break
 
                 if reply_text is None:

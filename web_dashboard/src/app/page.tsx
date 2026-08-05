@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 
 interface BlacklistEntry {
   discord_id: string;
@@ -195,10 +196,10 @@ export default function Home() {
                 TNC Bot là giải pháp toàn diện giúp các Officer tự động hóa quy trình quản lý thành viên, tổ chức Massing, theo dõi Siphoned Energy và cảnh báo Scammer liên minh.
               </p>
               <div className="flex justify-center gap-4 pt-4">
-                <button className="bg-primary hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-semibold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] hover:-translate-y-1">
-                  Mời Bot Vào Server (Sắp ra mắt)
-                </button>
-                <button className="glass-panel text-text-main hover:text-white px-8 py-3 rounded-full font-semibold transition-all hover:bg-surface-hover">
+                <Link href="/dashboard" className="bg-primary hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-semibold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] hover:-translate-y-1 block">
+                  Vào Dashboard Quản Trị (Test)
+                </Link>
+                <button onClick={() => setActiveTab('guide')} className="glass-panel text-text-main hover:text-white px-8 py-3 rounded-full font-semibold transition-all hover:bg-surface-hover">
                   Xem Hướng Dẫn Cài Đặt
                 </button>
               </div>

@@ -17,17 +17,13 @@ class GlobalBlacklist:
         
     def _load(self):
         default_data = {"blacklist": []}
-        if not os.path.exists(self.file_path):
-            save_json(self.file_path, default_data, sync_github=True)
-            return default_data
-        
-        data = load_json(self.file_path)
+        data = load_json(self.file_path, lambda: default_data)
         if "blacklist" not in data:
             data["blacklist"] = []
         return data
         
     def save(self):
-        save_json(self.file_path, self.data, sync_github=True)
+        save_json(self.data, self.file_path, sync_github=True)
         
     def check_blacklist(self, discord_id: str, ingame_id: str) -> Optional[dict]:
         for entry in self.data["blacklist"]:

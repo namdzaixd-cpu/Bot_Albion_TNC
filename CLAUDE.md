@@ -7,7 +7,7 @@ Xem [README.md](README.md) để biết tổng quan dự án, stack và cấu tr
 Khi user đề xuất tính năng mới hoặc sửa đổi code: **bàn thiết kế trước** (mô tả lệnh, logic, ảnh
 hưởng gì, file nào bị đụng) — KHÔNG viết/sửa code ngay.
 
-Chỉ viết/sửa code khi user gõ RÕ RÀNG một trong các từ xác nhận: **"chốt", "ok làm đi", "làm đi",
+Chỉ viết/sửa code khi user gõ RÕ RÀNG một trong các từ xác nhận: **"chốt", "ok", "oki", "ok làm đi", "làm đi",
 "chốt code đi"**.
 
 Các hành động sau KHÔNG tính là xác nhận: trả lời câu hỏi phụ, gửi ảnh/screenshot, cung cấp thêm
@@ -72,30 +72,32 @@ Sau khi đã "chốt", áp dụng 4 nguyên tắc này khi code:
   Storage lên GitHub). Chỉ chạy các script test độc lập (vd `test_api_key/*.py`, `py_compile`,
   test suite trong `bot/tests/`) — không chạy chính bot.
 - Cấu trúc bot: `bot/main.py` (entry point) + `bot/core/` (hạ tầng dùng chung: config, storage,
-  permissions, webserver) + `bot/cogs/` (mỗi hệ thống tính năng — siphoned, massing, lastseen,
-  guildcheck, alo_tts, corebank — là 1 cog riêng). Sửa 1 tính năng thì chỉ đụng cog tương ứng.
+  permissions, webserver, database) + `bot/cogs/` (mỗi hệ thống tính năng — about, alo_tts, blacklist,
+  chat_ai, corebank, guildcheck, lastseen, massing, onboarding, siphoned, wiki — là 1 cog riêng).
+  Sửa 1 tính năng thì chỉ đụng cog tương ứng.
 - Cấu hình AI Chat: Chỉ dẫn tính cách, prompt hệ thống nằm tại file [bot/core/templates/chat_ai_instruction.txt](bot/core/templates/chat_ai_instruction.txt). Chỉnh sửa file này thay vì sửa trực tiếp code Python trong cog.
 
-## Thư mục Storage — QUY TẮC BẮT BUỘC
+## Lưu trữ dữ liệu — QUY TẮC BẮT BUỘC (Supabase)
 
-`bot/Storage/` là nơi lưu trữ **dữ liệu vận hành thật** của bot (dữ liệu người dùng, cấu hình guild, template, điểm số...).
-Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có thay đổi (xem `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`).
+Dữ liệu vận hành thật của bot (dữ liệu người dùng, cấu hình guild, template, điểm số...) hiện được lưu trên
+**Supabase** — bảng `json_storage`, khóa theo tên file, qua lớp `load_json()` / `save_json()` trong
+`bot/core/storage.py`. Thư mục `bot/Storage/` là **legacy** từ thời lưu file JSON local (cơ chế sync
+GitHub `GITHUB_SYNCED_FILES` đã bị bỏ, `sync_to_github()`/`restore_from_github()` chỉ là stub) — không
+còn là nơi lưu dữ liệu vận hành thật.
 
 ### ⛔ TUYỆT ĐỐI KHÔNG được phép:
 
-- Xóa, ghi đè, hay sửa thẳng file JSON trong `bot/Storage/` — dù chỉ để test hay debug.
-- Đọc/ghi file trong thư mục này bằng `open()` thuần — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
-- Đặt file tạm, file test, file log vào đây — các file không phải dữ liệu kho sẽ làm ô nhiễm GitHub sync.
+- Đọc/ghi dữ liệu vận hành bằng `open()` thuần hay gọi thẳng Supabase — phải dùng `load_json()` / `save_json()` từ `bot/core/storage.py`.
+- Sửa/xóa dữ liệu trực tiếp trên bảng `json_storage` qua console Supabase để "test nhanh" — mọi thay đổi phải qua code.
+- Đặt file tạm, file test, file log vào `bot/Storage/` — thư mục này không còn được sync nên dữ liệu đặt vào sẽ thất lạc.
 
 ### ✅ Quy tắc khi thêm dữ liệu mới:
 
-1. File JSON mới **phải** đặt vào `bot/Storage/`.
-2. Import `STORAGE_DIR` từ `bot/core/config.py`, khai báo đường dẫn bằng `os.path.join(STORAGE_DIR, "tên_file.json")`.
-3. Đặt tên file theo pattern: `tnc_<tính_năng>_v<số_version>.json`
-   - Ví dụ đúng: `tnc_massing_v1.json`, `tnc_register_v1.json`, `tnc_sp_v32.json`
-   - Ví dụ sai: `data.json`, `config_temp.json`, `test123.json`
-4. Thêm đường dẫn mới vào danh sách `GITHUB_SYNCED_FILES` trong `bot/core/storage.py`.
-5. Đọc file chi tiết [bot/Storage/README.md](bot/Storage/README.md) trước khi thêm file mới.
+1. Mọi đọc/ghi dữ liệu phải qua `load_json()` / `save_json()` — không dùng `open()` thuần.
+2. Nếu cần thêm **bảng mới trên Supabase**: mô tả schema bảng (tên bảng, cột, kiểu, khóa chính) vào file docs của tính năng, và KHÔNG đụng bảng `json_storage` ngoài qua `storage.py`.
+3. Tên khóa/tên file vẫn theo pattern `tnc_<tính_năng>_v<số_version>` để dễ tra cứu trên Supabase.
+4. Mọi thao tác DB phải kiểm tra `SUPABASE_URL` / `SUPABASE_ANON_KEY` tồn tại và bọc trong `try-except` (xem mẫu ở `bot/core/database.py`) để không crash trên CI.
+5. Đọc file chi tiết [bot/Storage/README.md](bot/Storage/README.md) trước khi thay đổi dữ liệu.
 
 ## Skills & Agents có sẵn trong dự án
 
@@ -124,21 +126,44 @@ Thư mục này được **tự động đồng bộ lên GitHub** mỗi khi có
 - `python-reviewer` — review code Python (bảo mật, PEP8, type hint, concurrency, code quality)
 - `silent-failure-hunter` — săn lỗi nuốt exception / silent failure (vd: `except Exception: pass`)
 
-# Project-Scoped Rules
+## Project-Scoped Rules
 
-## Quy tắc lưu trữ Rules/Yêu cầu mới
+### Quy tắc lưu trữ Rules/Yêu cầu mới
 Khi có yêu cầu mới, rule mới hoặc chỉ dẫn từ người dùng (User Rules/Instructions), thay vì ghi vào file `.agents/AGENTS.md`, hãy ghi trực tiếp vào file [CLAUDE.md](file:/Bot_Albion_TNC/CLAUDE.md).
 
-## Feature Documentation
-Từ nay khi user mô tả tính năng mới trong quá trình phát triển, BẮT BUỘC phải tự động lưu mô tả cơ chế hoạt động và chi tiết cách hoạt động của tính năng đó vào một file riêng (vd: `docs/features.md` hoặc một markdown file tương ứng). 
+### Feature Documentation
+Từ nay khi user mô tả tính năng mới trong quá trình phát triển, BẮT BUỘC phải tự động lưu mô tả cơ chế hoạt động và chi tiết cách hoạt động của tính năng đó vào một file riêng (vd: `docs/features.md` hoặc một markdown file tương ứng).
 Việc này đảm bảo dữ liệu không bị thất lạc và có thể dùng trực tiếp để đưa lên web dashboard hoặc viết tài liệu hướng dẫn sau này.
 
-## Quy tắc quản lý Script tiện ích (Helper/Hotfix)
+### Quy tắc quản lý Script tiện ích (Helper/Hotfix)
 Khi tạo các script tiện ích, script vá lỗi (helper/hotfix/utility scripts) phát sinh trong quá trình phát triển dự án, BẮT BUỘC phải đặt chúng vào thư mục [scripts/](file:///Users/twot/Documents/CODE/Bot_Albion_TNC/scripts) thay vì thư mục gốc (root directory). Việc này giúp giữ cho thư mục gốc luôn gọn gàng và dễ dàng tìm kiếm/tham khảo các script này khi cần.
 
-## Ngôn ngữ & xưng hô
-
+### Ngôn ngữ & xưng hô
 
 Giao tiếp bằng tiếng Việt xương hô theo cách người dùng gọi.
 - Tuyệt đối làm theo đúng luồng: (1) Lắng nghe ý tưởng -> (2) Phân tích 3 phương án -> (3) Đợi user chốt -> (4) Lên Implementation Plan chi tiết -> (5) Đợi chốt plan -> (6) Code.
 - Lưu ý về Implementation Plan: Mỗi khi có yêu cầu lên bảng kế hoạch (Implementation Plan), PHẢI tạo một file artifact mới hoàn toàn (ví dụ: `implementation_plan_v2.md`, `implementation_plan_featureX.md`). TUYỆT ĐỐI KHÔNG ghi đè lên bản cũ để lưu trữ lịch sử tất cả các bản plan.
+
+### Lưu trữ Artifacts (Plan, Task, Walkthrough)
+BẮT BUỘC: Khi hoàn thành một tính năng hoặc đợt cập nhật có sử dụng các file artifact (Implementation Plan, Task, Walkthrough), bạn PHẢI tự động copy các file này từ thư mục ẩn của IDE ra để lưu trữ vĩnh viễn vào dự án.
+Để tránh làm rác thư mục, phải tuân thủ nghiêm ngặt quy tắc cấu trúc sau:
+1. Tạo một thư mục con riêng biệt nằm trong `docs/tasks/` theo định dạng `<YYYY-MM-DD>_<Tên_Tính_Năng>` (ví dụ: `docs/tasks/2026-08-04_supabase_migration/`).
+2. Lưu các file artifact vào thư mục đó và ĐỔI TÊN theo thứ tự hợp lý để dễ đọc:
+   - `01_plan.md` (Từ Implementation Plan)
+   - `02_task.md` (Từ Task list)
+   - `03_walkthrough.md` (Từ Walkthrough)
+Không bao giờ được ném chung một đống file ra ngoài thư mục gốc hay các thư mục dùng chung, cũng không được ghi đè/xóa bỏ tài liệu cũ.
+
+### Thói quen (BẮT BUỘC TUÂN THỦ)
+
+Từ những kinh nghiệm và lịch sử commit, AI phải luôn tuân thủ các thói quen sau khi làm việc trên dự án này:
+
+1. **Cẩn tắc vô áy náy trên CI (Continuous Integration):**
+   - Mọi đoạn code khởi tạo kết nối Database (Supabase, SQL), gọi API bên ngoài, hoặc sử dụng cấu hình nhạy cảm đều BẮT BUỘC phải được bọc trong khối `try-except`.
+   - Phải kiểm tra sự tồn tại của biến môi trường trước khi khởi tạo để đảm bảo code không bao giờ crash (làm sập luồng test) trên môi trường CI (nơi thường không có sẵn file `.env`).
+
+2. **Đồng bộ Config môi trường:**
+   - Bất cứ khi nào thêm, xóa hoặc sửa một biến môi trường trong file `.env`, phải TỰ ĐỘNG cập nhật file `.env.example` tương ứng để đồng bộ cấu hình cho các thành viên khác trong team.
+
+3. **Thẩm mỹ UI/Hình ảnh:**
+   - Khi thiết kế giao diện (UI) hoặc tạo sinh/chọn hình ảnh (ví dụ: avatar bot, icon), luôn ưu tiên phong cách tối giản (minimalist), tinh tế, rõ ràng và không rườm rà.
