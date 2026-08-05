@@ -81,8 +81,7 @@ class ChatAI(commands.Cog):
         self.ai_config = {
             "channel_buffers": {}, 
             "intercept_channels": [], 
-            "autowiki_channels": [], 
-            "library_channel_ids": [], 
+            "library_channel_ids": [],
             "vision_channels": [], 
             "model": "inclusionai/ling-3.0-flash:free"
         }
@@ -382,34 +381,6 @@ class ChatAI(commands.Cog):
         save_json(self.library_data, self.library_file)
         await interaction.response.send_message("✅ Đã xóa toàn bộ kiến thức trong Thư viện Nội bộ.", ephemeral=False)
 
-    @ailibrary_group.command(name="autowiki", description="Bật/Tắt tính năng tự động tra cứu Albion Wiki khi bot bị tag")
-    @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
-    @app_commands.choices(state=[
-        app_commands.Choice(name="Bật (On)", value="on"),
-        app_commands.Choice(name="Tắt (Off)", value="off")
-    ])
-    async def aimodel_autowiki(self, interaction: discord.Interaction, state: str):
-        self._reload_config()
-        if not is_officer(interaction.user):
-            await interaction.response.send_message("❌ Xin lỗi, chỉ Ban quản trị mới được quyền chỉnh!", ephemeral=True)
-            return
-            
-        channel_id = str(interaction.channel_id)
-        autowiki = self.ai_config.get("autowiki_channels", [])
-        
-        if state == "on":
-            if channel_id not in autowiki:
-                autowiki.append(channel_id)
-                self.ai_config["autowiki_channels"] = autowiki
-                self._save_ai_config()
-            await interaction.response.send_message("✅ Đã **BẬT** tính năng Tự động tra cứu Wiki cho kênh này. Bot sẽ thông minh hơn nhưng phản hồi chậm đi 1-2 giây.", ephemeral=False)
-        else:
-            if channel_id in autowiki:
-                autowiki.remove(channel_id)
-                self.ai_config["autowiki_channels"] = autowiki
-                self._save_ai_config()
-            await interaction.response.send_message("✅ Đã **TẮT** tính năng Tự động tra cứu Wiki cho kênh này.", ephemeral=False)
-
     @aichat_group.command(name="vision", description="Bật/Tắt tính năng Bot đọc ảnh (Vision) ở kênh này")
     @app_commands.describe(state="Nhập 'on' để bật, 'off' để tắt")
     @app_commands.choices(state=[
@@ -664,16 +635,6 @@ class ChatAI(commands.Cog):
         channel_mentions = re.findall(r'<#(\d+)>', content)
         link_mentions = re.findall(r'discord\.com/channels/\d+/(\d+)', content)
         
-        # Auto Wiki Search
-        wiki_context = ""
-        autowiki = self.ai_config.get("autowiki_channels", [])
-        if channel_id_str in autowiki and is_mentioned and not is_random_intercept:
-            question_keywords = ["là gì", "thế nào", "cách", "hướng dẫn", "tác dụng", "cơ chế", "chỉ số", "chiêu", "skill", "item", "vũ khí", "áo", "mũ", "giày", "?", "wiki", "tìm hiểu", "cho hỏi", "dùng để"]
-            if any(kw in content_lower for kw in question_keywords):
-                await message.channel.typing()
-                wiki_data = await self._search_wiki_async(content)
-                wiki_context = f"--- Dữ liệu tra cứu tự động từ Albion Wiki ---\n{wiki_data}\n--------------------------------------\n\n"
-        
         # Thư viện nội bộ RAG
         library_context = ""
         if self.library_data:
@@ -803,8 +764,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context or web_context or wiki_context or library_context:
-            prompt = guild_info + context_data + reply_context + library_context + web_context + wiki_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context or library_context:
+            prompt = guild_info + context_data + reply_context + library_context + web_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             

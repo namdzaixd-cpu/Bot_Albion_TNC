@@ -61,7 +61,6 @@ FEATURE_FIELDS = [
         "`/ailibrary set_channel` (đặt kênh thư viện — Officer)\n"
         "`/ailibrary scan` (quét thư viện RAG — Officer)\n"
         "`/ailibrary clear` (xóa thư viện RAG — Officer)\n"
-        "`/ailibrary autowiki` (bật/tắt tự tra Wiki — Officer)\n"
         "`/wiki` (tra cứu Wiki Albion thủ công)",
     ),
     (
