@@ -23,14 +23,13 @@ URL_RE = re.compile(r"https?://\S+")
 
 
 def load_tts_config():
-    data = {"read_name": {}, "rejoin": {}, "afk": {}}
+    data = {"read_name": {}, "rejoin": {}}
     try:
         resp = supabase.table("alo_tts_config").select("*").eq("id", 1).execute()
         if resp.data:
             row = resp.data[0]
             data["read_name"] = row.get("read_name", {})
             data["rejoin"] = row.get("rejoin", {})
-            data["afk"] = row.get("afk", {})
     except Exception as e:
         print(f"Error loading alo_tts_config from Supabase: {e}")
     return data
@@ -41,8 +40,7 @@ def save_tts_config(data):
         record = {
             "id": 1,
             "read_name": data.get("read_name", {}),
-            "rejoin": data.get("rejoin", {}),
-            "afk": data.get("afk", {})
+            "rejoin": data.get("rejoin", {})
         }
         supabase.table("alo_tts_config").upsert(record).execute()
     except Exception as e:
@@ -88,88 +86,13 @@ class AloTtsCog(commands.Cog):
         self.tts_queues = {}
         # tts_workers[guild_id] = asyncio.Task đang xử lý queue
         self.tts_workers = {}
-        # afk_sessions[guild_id] = channel_id – bot đang AFK vô hạn (tạm thời trên RAM)
-        self.afk_sessions = {}
-        # afk_tasks[guild_id] = asyncio.Task giữ kết nối AFK
-        self.afk_tasks = {}
-        
-        # Khôi phục các session AFK từ config khi bot khởi động
-        self.bot.loop.create_task(self._resume_afk_sessions())
-
-    async def _resume_afk_sessions(self):
-        """Chạy ngầm 1 lần khi cog load để lấy config AFK và ném vào keepalive loop."""
-        await self.bot.wait_until_ready()
-        config = load_tts_config()
-        afk_cfg = config.get("afk", {})
-        for gid_str, cid in afk_cfg.items():
-            gid = int(gid_str)
-            self.afk_sessions[gid] = cid
-            self.afk_tasks[gid] = self.bot.loop.create_task(self._afk_keepalive(gid, cid))
-            print(f"♻️ [AFK] Đã khôi phục tác vụ giữ kết nối cho channel {cid}")
-
-    def cog_unload(self):
-        """Huỷ tất cả AFK tasks khi cog bị unload."""
-        for task in self.afk_tasks.values():
-            task.cancel()
-
-    async def _afk_keepalive(self, guild_id: int, channel_id: int):
-        """Loop giữ kết nối AFK vô hạn. Tự rejoin nếu bị ngắt."""
-        print(f"🔒 [AFK] Bắt đầu keepalive cho guild {guild_id}, channel {channel_id}")
-        REJOIN_DELAY = 3      # giây chờ trước khi rejoin
-        KEEPALIVE_INTERVAL = 600  # giây giữa mỗi lần ping (10 phút)
-        while guild_id in self.afk_sessions:
-            guild = self.bot.get_guild(guild_id)
-            if not guild:
-                await asyncio.sleep(REJOIN_DELAY)
-                continue
-
-            vc = guild.voice_client
-            channel = guild.get_channel(channel_id)
-            if not channel:
-                print(f"⚠️ [AFK] Channel {channel_id} không còn tồn tại, dừng AFK.")
-                self.afk_sessions.pop(guild_id, None)
-                break
-
-            # Reconnect nếu chưa kết nối
-            if not vc or not vc.is_connected():
-                try:
-                    if vc:
-                        await vc.disconnect(force=True)
-                    vc = await channel.connect()
-                    self.voice_sessions[guild_id] = {"channel_id": channel_id, "intentional_leave": False}
-                    print(f"🔄 [AFK] Đã rejoin **{channel.name}**")
-                except Exception as e:
-                    print(f"⚠️ [AFK] Rejoin thất bại: {e}")
-                    await asyncio.sleep(REJOIN_DELAY)
-                    continue
-            elif vc.channel.id != channel_id:
-                # Bot bị kéo sang channel khác – quay lại đúng channel AFK
-                try:
-                    await vc.move_to(channel)
-                    self.voice_sessions[guild_id] = {"channel_id": channel_id, "intentional_leave": False}
-                    print(f"↩️  [AFK] Đã quay lại **{channel.name}**")
-                except Exception as e:
-                    print(f"⚠️ [AFK] Move thất bại: {e}")
-
-            # Keepalive: phát 20ms silence để tránh Discord idle-disconnect
-            if vc and vc.is_connected() and not vc.is_playing():
-                try:
-                    vc.play(
-                        discord.PCMAudio(b"\x00" * 3840),  # 20ms stereo 48kHz silence
-                        after=lambda e: None,
-                    )
-                except Exception as e:
-                    print(f"[Error] {e}")
-                    pass  # Không cần lo nếu lỗi, chỉ là keepalive
-
-            await asyncio.sleep(KEEPALIVE_INTERVAL)
-        print(f"🔓 [AFK] Kết thúc keepalive cho guild {guild_id}")
 
     async def enqueue_tts(self, guild: discord.Guild, text: str, author_name: str):
         if not text or not text.strip():
             return
         gid = guild.id
         config = load_tts_config()
+        # Áp dụng chung cho toàn bộ server (guild)
         read_name = config.get("read_name", {}).get(str(gid), True)
         full_text = f"{author_name} nói: {text}" if read_name else text
 
@@ -238,10 +161,6 @@ class AloTtsCog(commands.Cog):
         guild = member.guild
 
         if before.channel is not None and after.channel is None:
-            # Nếu đang ở chế độ AFK – keepalive loop sẽ tự xử lý rejoin
-            if guild.id in self.afk_sessions:
-                return
-
             session = self.voice_sessions.get(guild.id)
             if session and session.get("intentional_leave"):
                 self.voice_sessions.pop(guild.id, None)
@@ -271,10 +190,6 @@ class AloTtsCog(commands.Cog):
     async def alojoin_cmd(self, interaction: discord.Interaction):
         guild = interaction.guild
         
-        # Chặn kéo bot nếu đang AFK (trừ Officer)
-        if guild.id in self.afk_sessions and not is_officer(interaction.user):
-            return await interaction.response.send_message("🔒 Bot đang bị khoá ở chế độ AFK vô hạn. Chỉ Officer mới có quyền thao tác!", ephemeral=True)
-            
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message("❌ Bạn phải đang ở trong 1 voice channel!", ephemeral=True)
         channel = interaction.user.voice.channel
@@ -299,10 +214,6 @@ class AloTtsCog(commands.Cog):
     async def aloleave_cmd(self, interaction: discord.Interaction):
         guild = interaction.guild
         
-        # Chặn đuổi bot nếu đang AFK (trừ Officer)
-        if guild.id in self.afk_sessions and not is_officer(interaction.user):
-            return await interaction.response.send_message("🔒 Bot đang bị khoá ở chế độ AFK vô hạn. Hãy nhờ Officer dùng `/aloafkstop`!", ephemeral=True)
-            
         vc = guild.voice_client
         if not vc:
             return await interaction.response.send_message("❌ Bot không ở voice nào cả!", ephemeral=True)
@@ -380,96 +291,6 @@ class AloTtsCog(commands.Cog):
             return await interaction.response.send_message("❌ Bot không ở voice nào cả!", ephemeral=True)
         self.mute_state[guild.id] = False
         await interaction.response.send_message("🔊 Đã bật lại tiếng đọc TTS.", ephemeral=True)
-
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # AFK VÔ HẠN
-    # ──────────────────────────────────────────────────────────────────────────
-
-    @app_commands.command(name="aloafk", description="Bot AFK vô hạn trong 1 voice channel (Officer only)")
-    @app_commands.describe(voice="Voice channel muốn bot ở lại vô hạn")
-    async def aloafk_cmd(self, interaction: discord.Interaction, voice: discord.VoiceChannel):
-        if not is_officer(interaction.user):
-            return await interaction.response.send_message("❌ Bạn không có quyền dùng lệnh này!", ephemeral=True)
-
-        guild = interaction.guild
-        gid = guild.id
-
-        # Dừng AFK cũ nếu đang chạy
-        if gid in self.afk_tasks:
-            old_task = self.afk_tasks.pop(gid)
-            old_task.cancel()
-        self.afk_sessions.pop(gid, None)
-
-        await interaction.response.defer(ephemeral=True)
-        try:
-            vc = guild.voice_client
-            if vc and vc.channel.id == voice.id:
-                pass  # Đã ở đúng channel
-            elif vc:
-                await vc.move_to(voice)
-            else:
-                await voice.connect()
-
-            self.afk_sessions[gid] = voice.id
-            self.voice_sessions[gid] = {"channel_id": voice.id, "intentional_leave": False}
-            self.mute_state[gid] = False
-
-            # LƯU VÀO CONFIG ĐỂ SỐNG SÓT KHI BỊ RESTART (RENDER PUSH CODE)
-            config = load_tts_config()
-            afk_cfg = config.setdefault("afk", {})
-            afk_cfg[str(gid)] = voice.id
-            save_tts_config(config)
-
-            task = self.bot.loop.create_task(self._afk_keepalive(gid, voice.id))
-            self.afk_tasks[gid] = task
-
-            await interaction.followup.send(
-                f"✅ Bot đang **AFK vô hạn** tại **{voice.name}**! \n"
-                f"Dùng `/aloafkstop` để dừng.",
-                ephemeral=True,
-            )
-        except Exception as e:
-            self.afk_sessions.pop(gid, None)
-            await interaction.followup.send(f"❌ Không thể AFK: {e}", ephemeral=True)
-
-    @app_commands.command(name="aloafkstop", description="Dừng chế độ AFK và bot rời voice (Officer only)")
-    async def aloafkstop_cmd(self, interaction: discord.Interaction):
-        if not is_officer(interaction.user):
-            return await interaction.response.send_message("❌ Bạn không có quyền dùng lệnh này!", ephemeral=True)
-
-        guild = interaction.guild
-        gid = guild.id
-
-        if gid not in self.afk_sessions:
-            return await interaction.response.send_message("❌ Bot không đang AFK ở voice nào cả!", ephemeral=True)
-
-        # Huỷ keepalive task
-        task = self.afk_tasks.pop(gid, None)
-        if task:
-            task.cancel()
-        self.afk_sessions.pop(gid, None)
-
-        # XÓA KHỎI CONFIG
-        config = load_tts_config()
-        if "afk" in config and str(gid) in config["afk"]:
-            del config["afk"][str(gid)]
-            save_tts_config(config)
-
-        vc = guild.voice_client
-        channel_name = vc.channel.name if vc else "voice"
-        if vc:
-            session = self.voice_sessions.get(gid, {})
-            session["intentional_leave"] = True
-            self.voice_sessions[gid] = session
-            await vc.disconnect()
-        self.voice_sessions.pop(gid, None)
-        self.mute_state.pop(gid, None)
-
-        await interaction.response.send_message(
-            f"🛑 Đã dừng AFK và bot rời **{channel_name}**.",
-            ephemeral=True,
-        )
 
 
 async def setup(bot: commands.Bot):
