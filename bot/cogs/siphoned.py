@@ -393,47 +393,80 @@ class SiphonedCog(commands.Cog):
         )
 
     # ── /addsp ─────────────────────────────────────────────────────────────────
-    @app_commands.command(name="addsp", description="Cộng tay SP cho một thành viên (Officer)")
-    @app_commands.describe(name="Tên player trong game", amt="Số SP muốn cộng")
+    @app_commands.command(name="addsp", description="Cộng tay SP cho một hoặc nhiều thành viên (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy", amt="Số SP muốn cộng")
     async def addsp(self, interaction: discord.Interaction, name: str, amt: int):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
         if amt <= 0:
             return await interaction.response.send_message("⚠️ Số điểm phải lớn hơn 0!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
         data = load_sp()
-        data["history"][name] = data["history"].get(name, 0) + amt
+        for t in targets:
+            data["history"][t] = data["history"].get(t, 0) + amt
         save_sp(data)
-        await interaction.response.send_message(f"💎 **[SIPHONED]** Đã cộng tay **+{amt:,}** SP cho **{name}**.")
+        if len(targets) == 1:
+            await interaction.response.send_message(
+                f"💎 **[SIPHONED]** Đã cộng tay **+{amt:,}** SP cho **{targets[0]}**."
+            )
+        else:
+            lines = "\n".join(f"✅ `{t}` → +{amt:,} SP" for t in targets)
+            await interaction.response.send_message(
+                f"💎 **[SIPHONED]** Đã cộng **+{amt:,}** SP cho **{len(targets)}** thành viên:\n{lines}"
+            )
 
     # ── /removesp ──────────────────────────────────────────────────────────────
-    @app_commands.command(name="removesp", description="Trừ SP của một thành viên (Officer)")
-    @app_commands.describe(name="Tên player trong game", amt="Số SP muốn trừ")
+    @app_commands.command(name="removesp", description="Trừ SP của một hoặc nhiều thành viên (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy", amt="Số SP muốn trừ")
     async def removesp(self, interaction: discord.Interaction, name: str, amt: int):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Bạn không có quyền sử dụng lệnh này!", ephemeral=True)
         if amt <= 0:
             return await interaction.response.send_message("⚠️ Số điểm trừ phải lớn hơn 0!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
         data = load_sp()
-        if name not in data["history"]:
-            return await interaction.response.send_message(f"❓ Không tìm thấy thành viên mang tên `{name}` trong bảng dữ liệu.")
-        data["history"][name] = data["history"].get(name, 0) - amt
+        results = []
+        for t in targets:
+            if t not in data["history"]:
+                results.append(f"❌ `{t}` → không tìm thấy")
+            else:
+                data["history"][t] = data["history"].get(t, 0) - amt
+                results.append(f"✅ `{t}` → -{amt:,} SP (còn lại: {data['history'][t]:,})")
         save_sp(data)
-        await interaction.response.send_message(
-            f"📉 **[SIPHONED]** Đã trừ bớt **-{amt:,}** SP của thành viên **{name}**.\n"
-            f"📊 Điểm hiện tại của họ: **{data['history'][name]:,}** SP."
-        )
+        if len(targets) == 1 and data["history"].get(targets[0]) is not None:
+            await interaction.response.send_message(
+                f"📉 **[SIPHONED]** Đã trừ bớt **-{amt:,}** SP của thành viên **{targets[0]}**.\n"
+                f"📊 Điểm hiện tại: **{data['history'].get(targets[0], 0):,}** SP."
+            )
+        else:
+            lines = "\n".join(results)
+            await interaction.response.send_message(
+                f"📉 **[SIPHONED]** Kết quả trừ SP ({amt:,}) cho **{len(targets)}** thành viên:\n{lines}"
+            )
 
     # ── /removesprole ──────────────────────────────────────────────────────────
-    @app_commands.command(name="removesprole", description="Xóa hoàn toàn một thành viên khỏi bảng Siphoned (Officer)")
-    @app_commands.describe(name="Tên player trong game (chính xác)")
+    @app_commands.command(name="removesprole", description="Xóa hoàn toàn một hoặc nhiều thành viên khỏi bảng Siphoned (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy")
     async def removesprole(self, interaction: discord.Interaction, name: str):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
         data = load_sp()
-        if name not in data["history"]:
-            return await interaction.response.send_message(f"❓ Không tìm thấy thành viên `{name}`.")
-        delete_sp_user(name)
-        await interaction.response.send_message(f"🧹 Đã xóa hoàn toàn thành viên **{name}** ra khỏi bảng xếp hạng Siphoned.")
+        results = []
+        for t in targets:
+            if t not in data["history"]:
+                results.append(f"❌ `{t}` → không tìm thấy")
+            else:
+                delete_sp_user(t)
+                results.append(f"✅ `{t}` → đã xóa")
+        if len(targets) == 1:
+            await interaction.response.send_message(results[0].replace("✅ ", "🧹 ").replace(" → đã xóa", f" đã bị xóa khỏi bảng xếp hạng Siphoned."))
+        else:
+            ok = sum(1 for r in results if r.startswith("✅"))
+            lines = "\n".join(results)
+            await interaction.response.send_message(
+                f"🧹 **Kết quả xóa** {ok}/{len(targets)} thành viên:\n{lines}"
+            )
 
     # ── /resetsp ───────────────────────────────────────────────────────────────
     @app_commands.command(name="resetsp", description="Reset toàn bộ bảng điểm Siphoned về 0 (Officer)")
