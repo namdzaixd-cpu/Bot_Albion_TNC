@@ -15,11 +15,14 @@ FEATURE_FIELDS = [
     (
         "💎 Siphoned Points",
         "`/spupdate` (cập nhật log siphoned)\n"
-        "`/spcheck` (xem bảng xếp hạng)\n"
-        "`!addsp` (cộng điểm tay — Officer)\n"
-        "`!removesp` (trừ điểm tay — Officer)\n"
-        "`!removesprole` (xóa thành viên khỏi bảng — Officer)\n"
-        "`!resetsp` (reset toàn bộ bảng — Officer)",
+        "`/spcheck` (xem bảng xếp hạng tổng tích lũy)\n"
+        "`/sphistory` (lịch sử đóng góp của 1 thành viên)\n"
+        "`/sptop` (bảng xếp hạng theo thời gian)\n"
+        "`/splog` (audit log upload — Officer)\n"
+        "`/addsp` (cộng điểm tay — Officer)\n"
+        "`/removesp` (trừ điểm tay — Officer)\n"
+        "`/removesprole` (xóa thành viên khỏi bảng — Officer)\n"
+        "`/resetsp` (reset toàn bộ bảng — Officer)",
     ),
     (
         "⚔️ Massing",
