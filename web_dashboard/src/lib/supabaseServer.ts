@@ -5,15 +5,8 @@
 // để tránh crash lúc build (collect page data) khi thiếu env.
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
-// Ưu tiên SERVICE ROLE (bypass RLS, cần thiết để dashboard đọc/ghi data thật).
-// Fallback anon key (NEXT_PUBLIC_*) chỉ để không crash nếu thiếu service role —
-// nhưng anon bị RLS deny nên dashboard sẽ trắng -> CẦN set SUPABASE_SERVICE_ROLE_KEY trên env.
-const serviceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  "";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 let _client: SupabaseClient | null = null;
 let _init = false;
