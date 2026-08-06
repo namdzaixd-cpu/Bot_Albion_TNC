@@ -5,7 +5,7 @@ from datetime import datetime
 import discord
 from discord.ext import commands
 
-from core.database import supabase
+from core.database import execute
 
 # ==============================================================================
 # HỆ THỐNG FILTER THÀNH VIÊN (LastSeen)
@@ -20,13 +20,15 @@ class LastSeenCog(commands.Cog):
     async def cog_load(self):
         # Fetch initial data from Supabase to populate cache
         try:
-            response = supabase.table("user_activity").select("user_id, last_seen").execute()
-            if response.data:
+            response, err = execute(lambda c: c.table("user_activity").select("user_id, last_seen"))
+            if err:
+                print(f"Error loading user_activity: {err}")
+            elif response and response.data:
                 for row in response.data:
                     self.cache[row["user_id"]] = row["last_seen"]
         except Exception as e:
             print(f"Error loading user_activity from Supabase: {e}")
-            
+
         self.bot.loop.create_task(self._flush_loop())
 
     def save(self):
@@ -34,13 +36,15 @@ class LastSeenCog(commands.Cog):
         records = []
         for user_id, timestamp in self.cache.items():
             records.append({"user_id": str(user_id), "last_seen": timestamp})
-        
+
         try:
             # Upsert in chunks
             chunk_size = 1000
             for i in range(0, len(records), chunk_size):
                 chunk = records[i:i+chunk_size]
-                supabase.table("user_activity").upsert(chunk).execute()
+                _, err = execute(lambda c: c.table("user_activity").upsert(chunk))
+                if err:
+                    print(f"Error saving user_activity chunk: {err}")
         except Exception as e:
             print(f"Error saving user_activity to Supabase: {e}")
 

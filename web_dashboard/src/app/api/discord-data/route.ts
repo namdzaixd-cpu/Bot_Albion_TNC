@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabaseServer";
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "712258265769050164";
 

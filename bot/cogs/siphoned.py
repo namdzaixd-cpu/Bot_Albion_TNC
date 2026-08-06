@@ -1,6 +1,6 @@
 import asyncio
-import os
-from datetime import datetime
+import io
+from datetime import datetime, timezone, timedelta
 
 import aiohttp
 import discord
@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from core.permissions import is_officer
-from core.database import supabase
+from core.database import execute
 
 # ==============================================================================
 # HỆ THỐNG PHÂN TÍCH ĐIỂM SIPHONED (LOG ANALYZER)
@@ -17,14 +17,16 @@ from core.database import supabase
 def load_sp():
     data = {"history": {}, "last_update": "Chưa có dữ liệu"}
     try:
-        # Load metadata
-        meta_resp = supabase.table("sp_metadata").select("last_update").eq("id", 1).execute()
-        if meta_resp.data:
+        meta_resp, err = execute(lambda c: c.table("sp_metadata").select("last_update").eq("id", 1))
+        if err:
+            print(f"Error loading SP metadata: {err}")
+        elif meta_resp and meta_resp.data:
             data["last_update"] = meta_resp.data[0]["last_update"]
-        
-        # Load history
-        history_resp = supabase.table("user_economy").select("user_id, silver_pieces").execute()
-        if history_resp.data:
+
+        history_resp, err2 = execute(lambda c: c.table("user_economy").select("user_id, silver_pieces"))
+        if err2:
+            print(f"Error loading SP history: {err2}")
+        elif history_resp and history_resp.data:
             for row in history_resp.data:
                 data["history"][row["user_id"]] = row["silver_pieces"]
     except Exception as e:
@@ -33,42 +35,69 @@ def load_sp():
 
 def save_sp(data):
     try:
-        # Save metadata
-        supabase.table("sp_metadata").upsert({"id": 1, "last_update": data.get("last_update", "N/A")}).execute()
-        
-        # Save history
+        _, err = execute(lambda c: c.table("sp_metadata").upsert(
+            {"id": 1, "last_update": data.get("last_update", "N/A")}))
+        if err:
+            print(f"Error saving sp_metadata: {err}")
+
         records = [{"user_id": user, "silver_pieces": sp} for user, sp in data.get("history", {}).items()]
-        
         if records:
             chunk_size = 1000
             for i in range(0, len(records), chunk_size):
-                chunk = records[i:i+chunk_size]
-                supabase.table("user_economy").upsert(chunk).execute()
+                _, err = execute(lambda c: c.table("user_economy").upsert(records[i:i+chunk_size]))
+                if err:
+                    print(f"Error saving user_economy chunk: {err}")
     except Exception as e:
         print(f"Error saving SP to Supabase: {e}")
 
+def save_transactions(rows: list[dict]):
+    """Ghi lịch sử từng dòng log vào sp_transactions, sau đó xóa record cũ > 1 năm."""
+    try:
+        if rows:
+            chunk_size = 1000
+            for i in range(0, len(rows), chunk_size):
+                _, err = execute(lambda c: c.table("sp_transactions").insert(rows[i:i+chunk_size]))
+                if err:
+                    print(f"Error inserting sp_transactions: {err}")
+        # Dọn dẹp record cũ hơn 1 năm
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+        _, err = execute(lambda c: c.table("sp_transactions").delete().lt("inserted_at", cutoff))
+        if err:
+            print(f"Error cleaning sp_transactions: {err}")
+    except Exception as e:
+        print(f"Error saving sp_transactions: {e}")
+
 def delete_sp_user(user_id):
     try:
-        supabase.table("user_economy").delete().eq("user_id", user_id).execute()
+        _, err = execute(lambda c: c.table("user_economy").delete().eq("user_id", user_id))
+        if err:
+            print(f"Error deleting user {user_id}: {err}")
     except Exception as e:
         print(f"Error deleting user {user_id} from Supabase: {e}")
 
 def reset_sp_history():
     try:
-        # Warning: This clears the whole table
-        # We can't do delete without filter in supabase python easily, so we just select all and delete in chunks or just one by one, 
-        # or it's better to just delete using a filter that matches all.
-        # But actually in supabase we can do delete().neq("user_id", "nothing")
-        supabase.table("user_economy").delete().neq("user_id", "").execute()
-        supabase.table("sp_metadata").upsert({"id": 1, "last_update": "N/A"}).execute()
+        _, err = execute(lambda c: c.table("user_economy").delete().neq("user_id", ""))
+        if err:
+            print(f"Error resetting user_economy: {err}")
+        _, err2 = execute(lambda c: c.table("sp_metadata").upsert({"id": 1, "last_update": "N/A"}))
+        if err2:
+            print(f"Error resetting sp_metadata: {err2}")
     except Exception as e:
         print(f"Error resetting SP history: {e}")
 
+
+# ==============================================================================
+# PAGINATOR — dùng chung cho spcheck và sptop
+# ==============================================================================
+
 class SiphonedPaginator(discord.ui.View):
-    def __init__(self, data, last_update):
+    def __init__(self, data, last_update, title="💎 TNC SIPHONED LEADERBOARD", label="Mốc Log Đã Cập Nhật:"):
         super().__init__(timeout=86400)
         self.data = data
         self.last_update = last_update
+        self.title = title
+        self.label = label
         self.current_page = 0
         self.per_page = 15
 
@@ -77,8 +106,8 @@ class SiphonedPaginator(discord.ui.View):
         end = start + self.per_page
         page_data = self.data[start:end]
         total_pages = (len(self.data) - 1) // self.per_page + 1 if self.data else 1
-        embed = discord.Embed(title="💎 TNC SIPHONED LEADERBOARD", color=0x9b59b6)
-        embed.add_field(name="📅 Mốc Log Đã Cập Nhật:", value=f"`{self.last_update}`", inline=False)
+        embed = discord.Embed(title=self.title, color=0x9b59b6)
+        embed.add_field(name=f"📅 {self.label}", value=f"`{self.last_update}`", inline=False)
         desc = ""
         for i, (player, value) in enumerate(page_data, start + 1):
             desc += f"**#{i}** `{player}` ➜ **{value:,}**\n"
@@ -91,18 +120,52 @@ class SiphonedPaginator(discord.ui.View):
         if self.current_page > 0:
             self.current_page -= 1
             await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        else:
+            await interaction.response.defer()
 
     @discord.ui.button(label="Sau ➡️", style=discord.ButtonStyle.gray)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if (self.current_page + 1) * self.per_page < len(self.data):
             self.current_page += 1
             await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        else:
+            await interaction.response.defer()
 
+
+# ==============================================================================
+# CONFIRM VIEW — dùng cho /resetsp
+# ==============================================================================
+
+class ResetConfirmView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=15)
+        self.confirmed = False
+
+    @discord.ui.button(label="✅ Xác nhận Reset", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.confirmed = True
+        self.stop()
+        reset_sp_history()
+        await interaction.response.edit_message(
+            content="🧹 Toàn bộ bảng xếp hạng điểm Siphoned đã được reset!",
+            view=None
+        )
+
+    @discord.ui.button(label="❌ Huỷ", style=discord.ButtonStyle.gray)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(content="↩️ Đã huỷ thao tác reset.", view=None)
+
+
+# ==============================================================================
+# COG
+# ==============================================================================
 
 class SiphonedCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # ── /spupdate ──────────────────────────────────────────────────────────────
     @app_commands.command(name="spupdate", description="Cập nhật file log Siphoned (tự kiểm tra ngày tháng)")
     async def spupdate(self, interaction: discord.Interaction, file_log: discord.Attachment):
         await interaction.response.defer()
@@ -132,8 +195,9 @@ class SiphonedCog(commands.Cog):
         if new_latest_time is None:
             return await interaction.followup.send("❌ Không đọc được mốc thời gian hợp lệ từ file log!")
 
-        # Bước 2: Chặn nếu file cũ hơn hoặc trùng mốc đã lưu
+        # Bước 2: Chặn nếu file cũ hơn hoặc trùng mốc đã lưu — parse old_last_update để dùng lại ở bước 3
         old_last_update_str = data.get("last_update", None)
+        old_last_update = None
         if old_last_update_str and old_last_update_str not in ("Chưa có dữ liệu", "N/A"):
             try:
                 old_last_update = datetime.strptime(old_last_update_str, "%Y-%m-%d %H:%M:%S")
@@ -147,14 +211,25 @@ class SiphonedCog(commands.Cog):
             except ValueError:
                 pass
 
-        # Bước 3: Xử lý cộng điểm
+        # Bước 3: Xử lý cộng điểm + thu thập transactions
+        # Mỗi dòng được parse timestamp riêng → bỏ qua dòng nào <= old_last_update (tránh double count khi file overlap)
         count = 0
+        skipped = 0
         time_set = False
+        transactions = []
         for line in lines:
             if "Player" in line or not line.strip():
                 continue
             parts = [p.strip().replace('"', '') for p in line.split('\t') if p.strip()]
             if len(parts) >= 4:
+                try:
+                    line_ts = datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    continue
+                # Bỏ qua dòng đã nằm trong vùng đã cộng trước đó
+                if old_last_update and line_ts <= old_last_update:
+                    skipped += 1
+                    continue
                 if not time_set:
                     data["last_update"] = parts[0]
                     time_set = True
@@ -162,13 +237,24 @@ class SiphonedCog(commands.Cog):
                     player_name = parts[1]
                     amount = int(parts[3])
                     data["history"][player_name] = data["history"].get(player_name, 0) + amount
+                    transactions.append({
+                        "player_name": player_name,
+                        "amount": amount,
+                        "log_timestamp": line_ts.isoformat(),
+                    })
                     count += 1
                 except ValueError:
                     continue
 
         save_sp(data)
-        await interaction.followup.send(f"✅ Xử lý thành công **{count}** dòng dữ liệu log.\nMốc log: `{data['last_update']}` (Đã lưu lên Supabase)")
+        save_transactions(transactions)
+        overlap_note = f"\n⏩ Bỏ qua **{skipped}** dòng overlap (đã cộng trước đó)" if skipped > 0 else ""
+        await interaction.followup.send(
+            f"✅ Xử lý thành công **{count}** dòng dữ liệu mới.{overlap_note}\n"
+            f"Mốc log: `{data['last_update']}` (Đã lưu lên Supabase + ghi lịch sử)"
+        )
 
+    # ── /spcheck ───────────────────────────────────────────────────────────────
     @app_commands.command(name="spcheck", description="Xem bảng xếp hạng tích lũy điểm Siphoned")
     async def spcheck(self, interaction: discord.Interaction):
         data = load_sp()
@@ -180,58 +266,246 @@ class SiphonedCog(commands.Cog):
         view = SiphonedPaginator(sorted_sp, last_up)
         await interaction.response.send_message(embed=view.create_embed(), view=view)
 
-    @commands.command(name="addsp")
-    async def addsp(self, ctx, name: str, amt: int):
-        if not is_officer(ctx.author):
-            return await ctx.send("❌ Bạn không có quyền!")
-        data = load_sp()
-        data["history"][name] = data["history"].get(name, 0) + amt
-        save_sp(data)
-        await ctx.send(f"💎 **[SIPHONED]** Đã cộng tay **+{amt:,}** SP cho **{name}**.")
-
-    @commands.command(name="removesp")
-    async def removesp(self, ctx, name: str, amt: int):
-        if not is_officer(ctx.author):
-            return await ctx.send("❌ Bạn không có quyền sử dụng lệnh này!")
-        if amt <= 0:
-            return await ctx.send("⚠️ Số điểm trừ phải lớn hơn 0 bro ơi!")
-        data = load_sp()
-        if name in data["history"]:
-            data["history"][name] = data["history"].get(name, 0) - amt
-            save_sp(data)
-            await ctx.send(f"📉 **[SIPHONED]** Đã trừ bớt **-{amt:,}** SP của thành viên **{name}**.\n📊 Điểm hiện tại của họ: **{data['history'][name]:,}** SP.")
-        else:
-            await ctx.send(f"❓ Không tìm thấy thành viên mang tên `{name}` trong bảng dữ liệu.")
-
-    @commands.command(name="removesprole")
-    async def removesprole(self, ctx, *, name: str):
-        if not is_officer(ctx.author):
-            return await ctx.send("❌ Bạn không có quyền!")
-        data = load_sp()
-        if name in data["history"]:
-            delete_sp_user(name)
-            await ctx.send(f"🧹 Đã xóa hoàn toàn thành viên **{name}** ra khỏi bảng xếp hạng Siphoned.")
-        else:
-            await ctx.send(f"❓ Không tìm thấy thành viên `{name}`.")
-
-    @commands.command(name="resetsp")
-    async def resetsp(self, ctx):
-        if not is_officer(ctx.author):
-            return await ctx.send("❌ Bạn không có quyền!")
-
-        def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel
-
-        await ctx.send("⚠️ Bạn có muốn đưa toàn bộ bảng điểm Siphoned về 0? Gõ `yes`.")
+    # ── /sphistory ─────────────────────────────────────────────────────────────
+    @app_commands.command(name="sphistory", description="Xem lịch sử đóng góp SP của một thành viên")
+    @app_commands.describe(player="Tên player trong game (phân biệt hoa/thường)")
+    async def sphistory(self, interaction: discord.Interaction, player: str):
+        await interaction.response.defer()
         try:
-            msg = await self.bot.wait_for('message', check=check, timeout=15.0)
-            if msg.content.lower() == 'yes':
-                reset_sp_history()
-                await ctx.send("🧹 Toàn bộ bảng xếp hạng điểm Siphoned đã được reset!")
-        except asyncio.TimeoutError:
-            pass
+            resp, err = execute(lambda c: c.table("sp_transactions")
+                .select("amount, log_timestamp")
+                .eq("player_name", player)
+                .order("log_timestamp", desc=True)
+                .limit(20))
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {err}")
+        except Exception as e:
+            return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {e}")
+
+        rows = resp.data if resp and resp.data else []
+        if not rows:
+            return await interaction.followup.send(
+                f"❓ Không tìm thấy lịch sử đóng góp nào của `{player}`.\n"
+                f"*(Lịch sử chỉ có từ khi tính năng này được bật)*"
+            )
+
+        total = sum(r["amount"] for r in rows)
+        desc = ""
+        for i, r in enumerate(rows, 1):
+            ts = r["log_timestamp"][:16] if r["log_timestamp"] else "N/A"
+            desc += f"**#{i}** `{ts}` ➜ **+{r['amount']:,}** SP\n"
+
+        embed = discord.Embed(
+            title=f"📋 Lịch sử SP — {player}",
+            description=desc,
+            color=0x9b59b6
+        )
+        embed.set_footer(text=f"Tổng {len(rows)} lần đóng góp gần nhất • Tổng cộng: {total:,} SP")
+        await interaction.followup.send(embed=embed)
+
+    # ── /sptop ─────────────────────────────────────────────────────────────────
+    @app_commands.command(name="sptop", description="Xem bảng xếp hạng SP theo khoảng thời gian")
+    @app_commands.describe(period="Khoảng thời gian muốn xem")
+    @app_commands.choices(period=[
+        app_commands.Choice(name="30 ngày gần nhất", value="30d"),
+        app_commands.Choice(name="3 tháng gần nhất", value="90d"),
+        app_commands.Choice(name="6 tháng gần nhất", value="6m"),
+        app_commands.Choice(name="Tất cả (từ khi bật tính năng)", value="all"),
+    ])
+    async def sptop(self, interaction: discord.Interaction, period: str):
+        await interaction.response.defer()
+
+        period_map = {"30d": 30, "90d": 90, "6m": 180}
+        period_label = {"30d": "30 ngày", "90d": "3 tháng", "6m": "6 tháng", "all": "Toàn bộ lịch sử"}
+
+        try:
+            def build(c):
+                q = c.table("sp_transactions").select("player_name, amount")
+                if period != "all":
+                    days = period_map[period]
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                    q = q.gte("inserted_at", cutoff)
+                return q
+            resp, err = execute(build)
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {err}")
+        except Exception as e:
+            return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {e}")
+
+        rows = resp.data if resp and resp.data else []
+        if not rows:
+            return await interaction.followup.send(
+                f"📊 Không có dữ liệu trong **{period_label[period]}**.\n"
+                f"*(Lịch sử chỉ có từ khi tính năng này được bật)*"
+            )
+
+        # Tổng hợp theo player
+        totals: dict[str, int] = {}
+        for r in rows:
+            totals[r["player_name"]] = totals.get(r["player_name"], 0) + r["amount"]
+
+        sorted_data = sorted(totals.items(), key=lambda x: x[1], reverse=True)
+        view = SiphonedPaginator(
+            sorted_data,
+            period_label[period],
+            title=f"💎 TOP SP — {period_label[period].upper()}",
+            label="Khoảng thời gian:"
+        )
+        await interaction.followup.send(embed=view.create_embed(), view=view)
+
+    # ── /splog ─────────────────────────────────────────────────────────────────
+    @app_commands.command(name="splog", description="Xem audit log các lần upload log gần nhất (Officer)")
+    async def splog(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền sử dụng lệnh này!", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            resp, err = execute(lambda c: c.table("sp_transactions")
+                .select("log_timestamp, inserted_at")
+                .order("inserted_at", desc=True)
+                .limit(200))
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn: {err}")
+        except Exception as e:
+            return await interaction.followup.send(f"❌ Lỗi khi truy vấn: {e}")
+
+        rows = resp.data if resp and resp.data else []
+        if not rows:
+            return await interaction.followup.send("📋 Chưa có audit log nào.")
+
+        # Nhóm theo mốc log_timestamp (mỗi lần upload 1 mốc)
+        batches: dict[str, int] = {}
+        for r in rows:
+            key = r["log_timestamp"][:16]
+            batches[key] = batches.get(key, 0) + 1
+
+        sorted_batches = sorted(batches.items(), key=lambda x: x[0], reverse=True)[:10]
+        desc = ""
+        for i, (ts, cnt) in enumerate(sorted_batches, 1):
+            desc += f"**#{i}** `{ts}` — **{cnt}** dòng dữ liệu\n"
+
+        embed = discord.Embed(title="📋 Audit Log — SP Transactions", description=desc, color=0xe67e22)
+        embed.set_footer(text="Hiển thị tối đa 10 lần upload gần nhất")
+        await interaction.followup.send(embed=embed)
+
+    # ── /spexport ──────────────────────────────────────────────────────────────
+    @app_commands.command(name="spexport", description="Xuất toàn bộ dữ liệu SP hiện tại ra file .txt (Officer)")
+    async def spexport(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        await interaction.response.defer()
+
+        data = load_sp()
+        history = data.get("history", {})
+        last_update = data.get("last_update", "N/A")
+
+        if not history:
+            return await interaction.followup.send("📊 Chưa có dữ liệu SP để xuất.")
+
+        sorted_sp = sorted(history.items(), key=lambda x: x[1], reverse=True)
+
+        lines = ['"Date"\t"Player"\t"Reason"\t"Amount"']
+        for player, sp in sorted_sp:
+            reason = "Withdrawal" if sp < 0 else "Deposit"
+            lines.append(f'"{last_update}"\t"{player}"\t"{reason}"\t"{sp}"')
+
+        content = "\n".join(lines)
+        file = discord.File(io.BytesIO(content.encode("utf-8")), filename="tnc_sp_exportdata.txt")
+        await interaction.followup.send(
+            f"📤 Xuất thành công **{len(sorted_sp)}** thành viên.\nMốc log: `{last_update}`",
+            file=file
+        )
+
+    # ── /addsp ─────────────────────────────────────────────────────────────────
+    @app_commands.command(name="addsp", description="Cộng tay SP cho một hoặc nhiều thành viên (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy", amt="Số SP muốn cộng")
+    async def addsp(self, interaction: discord.Interaction, name: str, amt: int):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        if amt <= 0:
+            return await interaction.response.send_message("⚠️ Số điểm phải lớn hơn 0!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
+        data = load_sp()
+        for t in targets:
+            data["history"][t] = data["history"].get(t, 0) + amt
+        save_sp(data)
+        if len(targets) == 1:
+            await interaction.response.send_message(
+                f"💎 **[SIPHONED]** Đã cộng tay **+{amt:,}** SP cho **{targets[0]}**."
+            )
+        else:
+            lines = "\n".join(f"✅ `{t}` → +{amt:,} SP" for t in targets)
+            await interaction.response.send_message(
+                f"💎 **[SIPHONED]** Đã cộng **+{amt:,}** SP cho **{len(targets)}** thành viên:\n{lines}"
+            )
+
+    # ── /removesp ──────────────────────────────────────────────────────────────
+    @app_commands.command(name="removesp", description="Trừ SP của một hoặc nhiều thành viên (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy", amt="Số SP muốn trừ")
+    async def removesp(self, interaction: discord.Interaction, name: str, amt: int):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền sử dụng lệnh này!", ephemeral=True)
+        if amt <= 0:
+            return await interaction.response.send_message("⚠️ Số điểm trừ phải lớn hơn 0!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
+        data = load_sp()
+        results = []
+        for t in targets:
+            if t not in data["history"]:
+                results.append(f"❌ `{t}` → không tìm thấy")
+            else:
+                data["history"][t] = data["history"].get(t, 0) - amt
+                results.append(f"✅ `{t}` → -{amt:,} SP (còn lại: {data['history'][t]:,})")
+        save_sp(data)
+        if len(targets) == 1 and data["history"].get(targets[0]) is not None:
+            await interaction.response.send_message(
+                f"📉 **[SIPHONED]** Đã trừ bớt **-{amt:,}** SP của thành viên **{targets[0]}**.\n"
+                f"📊 Điểm hiện tại: **{data['history'].get(targets[0], 0):,}** SP."
+            )
+        else:
+            lines = "\n".join(results)
+            await interaction.response.send_message(
+                f"📉 **[SIPHONED]** Kết quả trừ SP ({amt:,}) cho **{len(targets)}** thành viên:\n{lines}"
+            )
+
+    # ── /removesprole ──────────────────────────────────────────────────────────
+    @app_commands.command(name="removesprole", description="Xóa hoàn toàn một hoặc nhiều thành viên khỏi bảng Siphoned (Officer)")
+    @app_commands.describe(name="Tên player(s), cách nhau bằng dấu phẩy")
+    async def removesprole(self, interaction: discord.Interaction, name: str):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        targets = [n.strip() for n in name.split(",") if n.strip()]
+        data = load_sp()
+        results = []
+        for t in targets:
+            if t not in data["history"]:
+                results.append(f"❌ `{t}` → không tìm thấy")
+            else:
+                delete_sp_user(t)
+                results.append(f"✅ `{t}` → đã xóa")
+        if len(targets) == 1:
+            await interaction.response.send_message(results[0].replace("✅ ", "🧹 ").replace(" → đã xóa", f" đã bị xóa khỏi bảng xếp hạng Siphoned."))
+        else:
+            ok = sum(1 for r in results if r.startswith("✅"))
+            lines = "\n".join(results)
+            await interaction.response.send_message(
+                f"🧹 **Kết quả xóa** {ok}/{len(targets)} thành viên:\n{lines}"
+            )
+
+    # ── /resetsp ───────────────────────────────────────────────────────────────
+    @app_commands.command(name="resetsp", description="Reset toàn bộ bảng điểm Siphoned về 0 (Officer)")
+    async def resetsp(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        view = ResetConfirmView()
+        await interaction.response.send_message(
+            "⚠️ Bạn có chắc muốn **reset toàn bộ bảng điểm Siphoned**?\n"
+            "Hành động này **không thể hoàn tác**!",
+            view=view,
+            ephemeral=True
+        )
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(SiphonedCog(bot))
-

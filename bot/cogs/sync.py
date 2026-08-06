@@ -1,21 +1,13 @@
 import discord
 from discord.ext import commands
-from core.config import GUILD_ID, SUPABASE_URL, SUPABASE_KEY
-from supabase import create_client
-
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"⚠️ Không thể khởi tạo Supabase client trong sync: {e}")
+from core.config import GUILD_ID
+from core.database import execute
 
 class Sync(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     async def _upsert_channel(self, channel: discord.abc.GuildChannel):
-        if not supabase: return
         try:
             data = {
                 "id": str(channel.id),
@@ -24,19 +16,21 @@ class Sync(commands.Cog):
                 "guild_id": str(channel.guild.id)
             }
             # Supabase upsert uses the primary key 'id' to resolve conflicts
-            supabase.table("discord_channels").upsert(data).execute()
+            _, err = execute(lambda c: c.table("discord_channels").upsert(data))
+            if err:
+                print(f"Error upserting channel {channel.name}: {err}")
         except Exception as e:
             print(f"Error upserting channel {channel.name}: {e}")
 
     async def _delete_channel(self, channel_id: int):
-        if not supabase: return
         try:
-            supabase.table("discord_channels").delete().eq("id", str(channel_id)).execute()
+            _, err = execute(lambda c: c.table("discord_channels").delete().eq("id", str(channel_id)))
+            if err:
+                print(f"Error deleting channel {channel_id}: {err}")
         except Exception as e:
             print(f"Error deleting channel {channel_id}: {e}")
 
     async def _upsert_role(self, role: discord.Role):
-        if not supabase: return
         try:
             data = {
                 "id": str(role.id),
@@ -44,29 +38,34 @@ class Sync(commands.Cog):
                 "color": str(role.color),
                 "guild_id": str(role.guild.id)
             }
-            supabase.table("discord_roles").upsert(data).execute()
+            _, err = execute(lambda c: c.table("discord_roles").upsert(data))
+            if err:
+                print(f"Error upserting role {role.name}: {err}")
         except Exception as e:
             print(f"Error upserting role {role.name}: {e}")
-            
+
     async def _delete_role(self, role_id: int):
-        if not supabase: return
         try:
-            supabase.table("discord_roles").delete().eq("id", str(role_id)).execute()
+            _, err = execute(lambda c: c.table("discord_roles").delete().eq("id", str(role_id)))
+            if err:
+                print(f"Error deleting role {role_id}: {err}")
         except Exception as e:
             print(f"Error deleting role {role_id}: {e}")
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if not supabase: return
         print("🔄 Đang đồng bộ Channels và Roles lên Supabase...")
         guild = self.bot.get_guild(int(GUILD_ID))
         if guild:
             # Upsert Guild Config trước để tránh lỗi Foreign Key
             try:
-                supabase.table("guild_config").upsert({"guild_id": str(guild.id)}, on_conflict="guild_id").execute()
+                _, err = execute(lambda c: c.table("guild_config").upsert(
+                    {"guild_id": str(guild.id)}, on_conflict="guild_id"))
+                if err:
+                    print(f"Lỗi khi tạo guild_config trong sync: {err}")
             except Exception as e:
                 print(f"Lỗi khi tạo guild_config trong sync: {e}")
-                
+
             # Sync channels
             for channel in guild.channels:
                 await self._upsert_channel(channel)

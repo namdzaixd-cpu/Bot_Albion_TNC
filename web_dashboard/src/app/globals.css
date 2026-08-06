@@ -1,26 +1,19 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #0f1115;
-  --color-surface: #181b21;
-  --color-surface-hover: #21252d;
-  --color-border: #2a2e38;
-  --color-primary: #6366f1; /* Indigo 500 */
-  --color-primary-glow: rgba(99, 102, 241, 0.2);
-  --color-text-main: #f8fafc;
-  --color-text-muted: #94a3b8;
-  
+  --color-background: #05060f;
+  --color-surface: #0d1024;
+  --color-surface-hover: #141833;
+  --color-border: #232a4d;
+  --color-primary: #8b9cff; /* Starlight indigo */
+  --color-primary-glow: rgba(139, 156, 255, 0.25);
+  --color-accent: #67e8f9; /* Ice cyan */
+  --color-accent2: #fbbf77; /* Star gold */
+  --color-text-main: #eef1ff;
+  --color-text-muted: #8b90b8;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@utility animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
 }
 
 :root {
@@ -32,33 +25,110 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
-  background-image: radial-gradient(circle at 50% 0%, var(--color-primary-glow), transparent 40%);
-  background-attachment: fixed;
+  overflow-x: hidden;
 }
 
-.glass-panel {
-  background: rgba(24, 27, 33, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+/* ===== Night Sky Background ===== */
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 78% 12%, rgba(60,72,160,0.32), transparent 55%),
+    radial-gradient(100% 80% at 15% 85%, rgba(34,90,140,0.22), transparent 55%),
+    radial-gradient(140% 120% at 50% 0%, #0a0e26 0%, #070a1c 45%, #04050e 100%);
+  animation: skyBreath 22s ease-in-out infinite alternate;
+}
+@keyframes skyBreath {
+  0%   { filter: brightness(1)    hue-rotate(0deg); }
+  100% { filter: brightness(1.12) hue-rotate(-8deg); }
 }
 
-/* Custom scrollbar for webkit */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* faint grid like a celestial map */
+.grid-overlay {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(139,156,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,156,255,0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(circle at 50% 35%, black, transparent 85%);
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-background);
+/* ===== Starfield (twinkling stars) ===== */
+.starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.star {
+  position: absolute; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.9);
+  animation: twinkle var(--tw, 4s) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.15); }
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 4px;
+/* ===== Northern Constellation (Big Dipper) ===== */
+.constellation {
+  position: fixed;
+  top: 8%; right: 6%;
+  width: 240px; height: 200px;
+  z-index: 0; pointer-events: none;
+  transform-origin: 50% 50%;
+  animation: drift 60s linear infinite;
+  opacity: 0.9;
+}
+@keyframes drift {
+  0%   { transform: rotate(0deg)   translateY(0); }
+  50%  { transform: rotate(8deg)   translateY(-14px); }
+  100% { transform: rotate(0deg)   translateY(0); }
+}
+.constellation svg { width: 100%; height: 100%; overflow: visible; }
+.constellation .line { stroke: rgba(139,156,255,0.35); stroke-width: 1; fill: none;
+  filter: drop-shadow(0 0 4px rgba(139,156,255,0.6)); }
+.constellation .cstar { fill: #fff; filter: drop-shadow(0 0 5px #aab4ff); animation: ctwinkle 3.5s ease-in-out infinite; }
+@keyframes ctwinkle { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/* ===== Glass Card (nightglass) ===== */
+.glass {
+  background: rgba(13,16,36,0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139,156,255,0.18);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-surface-hover);
-}
+/* ===== Neon text (starlight) ===== */
+.neon-purple { color:#b9c2ff; text-shadow:0 0 8px rgba(139,156,255,.8),0 0 24px rgba(139,156,255,.4); }
+.neon-cyan   { color:#a5f3fc; text-shadow:0 0 8px rgba(103,232,249,.8),0 0 24px rgba(103,232,249,.4); }
+.neon-rose   { color:#fcd9a0; text-shadow:0 0 8px rgba(251,191,119,.8),0 0 24px rgba(251,191,119,.4); }
+
+@keyframes fadeIn { from {opacity:0;transform:translateY(14px)} to {opacity:1;transform:none} }
+.animate-fade-in { animation: fadeIn .5s cubic-bezier(.2,.8,.2,1) both; }
+
+/* ===== Count-up pop ===== */
+@keyframes pop { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+.count-pop { animation: pop .6s cubic-bezier(.2,.8,.2,1) both; }
+
+/* ===== Hero constellation core (small dipper accent) ===== */
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+.core-spin { animation: spinSlow 40s linear infinite; }
+@keyframes spinRev { to { transform: rotate(-360deg); } }
+.core-rev { animation: spinRev 30s linear infinite; }
+@keyframes pulseCore { 0%,100%{box-shadow:0 0 24px rgba(139,156,255,.6)} 50%{box-shadow:0 0 50px rgba(103,232,249,.8)} }
+.pulse-core { animation: pulseCore 4s ease-in-out infinite; }
+@keyframes orbit { from{transform:rotate(0) translateX(var(--r)) rotate(0)} to{transform:rotate(360deg) translateX(var(--r)) rotate(-360deg)} }
+.orbit-dot { animation: orbit var(--d,18s) linear infinite; }
+
+/* ===== Floating stardust (replaces particles) ===== */
+@keyframes floatUp { 0%{transform:translateY(0) translateX(0);opacity:0} 10%{opacity:.7} 90%{opacity:.5} 100%{transform:translateY(-90vh) translateX(20px);opacity:0} }
+.particle { position:fixed; bottom:-10px; border-radius:50%; background:rgba(180,200,255,.7); box-shadow:0 0 8px rgba(139,156,255,.8); animation:floatUp linear infinite; z-index:1; pointer-events:none; }
+
+/* ===== Custom scrollbar ===== */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(139,156,255,.3);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(139,156,255,.5)}
+
+.custom-scrollbar{scrollbar-width:thin;scrollbar-color:rgba(139,156,255,.3) transparent}
+html{scroll-behavior:smooth}
+::selection{background:rgba(139,156,255,.3)}

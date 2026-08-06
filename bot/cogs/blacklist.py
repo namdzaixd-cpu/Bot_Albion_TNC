@@ -1,61 +1,71 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import os
 import datetime
 import aiohttp
 from typing import Optional
 
-from core.config import STORAGE_DIR
-from core.storage import load_json, save_json
 from core.permissions import is_officer
+from core.database import execute
 
 class GlobalBlacklist:
-    def __init__(self):
-        self.file_path = os.path.join(STORAGE_DIR, "global_blacklist_v1.json")
-        self.data = self._load()
-        
-    def _load(self):
-        default_data = {"blacklist": []}
-        data = load_json(self.file_path, lambda: default_data)
-        if "blacklist" not in data:
-            data["blacklist"] = []
-        return data
-        
-    def save(self):
-        save_json(self.data, self.file_path, sync_github=True)
-        
     def check_blacklist(self, discord_id: str, ingame_id: str) -> Optional[dict]:
-        for entry in self.data["blacklist"]:
-            if entry.get("discord_id") == str(discord_id) or (ingame_id and entry.get("ingame_id") == str(ingame_id)):
-                return entry
+        try:
+            res, err = execute(lambda c: c.table("blacklist").select("*")
+                               .or_(f"discord_id.eq.{discord_id},ingame_id.eq.{ingame_id}"))
+            if err:
+                print(f"[Error] Lỗi khi check_blacklist Supabase: {err}")
+                return None
+            if res and res.data:
+                return res.data[0]
+        except Exception as e:
+            print(f"[Error] Lỗi khi check_blacklist Supabase: {e}")
         return None
-        
+
     def add_entry(self, discord_id: str, ingame_name: str, ingame_id: str, reason: str, officer_id: str, guild_id: str):
-        # Remove old if exists
-        self.data["blacklist"] = [e for e in self.data["blacklist"] if e.get("discord_id") != str(discord_id) and e.get("ingame_id") != str(ingame_id)]
-        
-        new_entry = {
-            "discord_id": str(discord_id),
-            "ingame_name": ingame_name,
-            "ingame_id": str(ingame_id),
-            "reason": reason,
-            "added_by_discord_id": str(officer_id),
-            "source_guild_id": str(guild_id),
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-        }
-        self.data["blacklist"].append(new_entry)
-        self.save()
-        
+        try:
+            new_entry = {
+                "discord_id": str(discord_id),
+                "ingame_name": ingame_name,
+                "ingame_id": str(ingame_id),
+                "reason": reason,
+                "added_by_discord_id": str(officer_id),
+                "source_guild_id": str(guild_id),
+                "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+            }
+            _, err = execute(lambda c: c.table("blacklist").upsert(new_entry))
+            if err:
+                print(f"[Error] Lỗi khi add_entry Supabase: {err}")
+        except Exception as e:
+            print(f"[Error] Lỗi khi add_entry Supabase: {e}")
+
     def remove_entry(self, identifier: str) -> bool:
-        initial_count = len(self.data["blacklist"])
-        self.data["blacklist"] = [e for e in self.data["blacklist"] 
-                                  if e.get("discord_id") != str(identifier) and e.get("ingame_name", "").lower() != str(identifier).lower()]
-        
-        if len(self.data["blacklist"]) < initial_count:
-            self.save()
-            return True
+        try:
+            res, err = execute(lambda c: c.table("blacklist").select("*")
+                               .or_(f"discord_id.eq.{identifier},ingame_name.ilike.{identifier}"))
+            if err:
+                print(f"[Error] Lỗi khi remove_entry query: {err}")
+                return False
+            if res and res.data:
+                for entry in res.data:
+                    _, e2 = execute(lambda c: c.table("blacklist").delete().eq("discord_id", entry["discord_id"]))
+                    if e2:
+                        print(f"[Error] Lỗi khi delete entry: {e2}")
+                return True
+        except Exception as e:
+            print(f"[Error] Lỗi khi remove_entry Supabase: {e}")
         return False
+
+    def get_all(self):
+        try:
+            res, err = execute(lambda c: c.table("blacklist").select("*"))
+            if err:
+                print(f"[Error] Lỗi khi get_all Supabase: {err}")
+                return []
+            return res.data or []
+        except Exception as e:
+            print(f"[Error] Lỗi khi get_all Supabase: {e}")
+            return []
 
 
 class BlacklistCog(commands.Cog):
@@ -133,7 +143,7 @@ class BlacklistCog(commands.Cog):
             await interaction.response.send_message("❌ Xin lỗi, chỉ Officer trở lên mới được quyền xem Blacklist!", ephemeral=True)
             return
             
-        entries = self.blacklist_db.data.get("blacklist", [])
+        entries = self.blacklist_db.get_all()
         if not entries:
             await interaction.response.send_message("✅ Danh sách đen hiện đang trống.", ephemeral=True)
             return

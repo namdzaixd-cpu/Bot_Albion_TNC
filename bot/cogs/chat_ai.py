@@ -23,7 +23,7 @@ from core.config import DATA_DIR, STORAGE_DIR, GEMINI_API_KEY, OPENROUTER_API_KE
 from core.permissions import is_officer
 from core.permissions import is_officer
 from core.storage import load_json, save_json
-from core.database import supabase
+from core.database import execute
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OLLAMA_URL = "https://ollama.com/api/chat"
@@ -73,7 +73,9 @@ class ChatAI(commands.Cog):
     def _save_ai_config(self):
         try:
             self.ai_config["guild_id"] = "default"
-            supabase.table("ai_config").upsert(self.ai_config).execute()
+            _, err = execute(lambda c: c.table("ai_config").upsert(self.ai_config))
+            if err:
+                print(f"Error saving ai_config: {err}")
         except Exception as e:
             print(f"Error saving ai_config: {e}")
 
@@ -86,8 +88,10 @@ class ChatAI(commands.Cog):
             "model": "inclusionai/ling-3.0-flash:free"
         }
         try:
-            resp = supabase.table("ai_config").select("*").eq("guild_id", "default").execute()
-            if resp.data:
+            resp, err = execute(lambda c: c.table("ai_config").select("*").eq("guild_id", "default"))
+            if err:
+                print(f"Error loading ai_config: {err}")
+            elif resp and resp.data:
                 self.ai_config.update(resp.data[0])
         except Exception as e:
             print(f"Error loading ai_config from Supabase: {e}")
@@ -835,13 +839,15 @@ class ChatAI(commands.Cog):
                             match = re.search(r'\[CALL_TOOL: search_chat_history\|(.*?)\]', reply_text)
                             keywords_str = match.group(1) if match else ""
                             keywords = [k.strip().lower() for k in keywords_str.split(',') if k.strip()]
-                            
-                            from core.config import SUPABASE_URL, SUPABASE_KEY
-                            from supabase import create_client
-                            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
-                            
-                            res = sb.table("chat_history").select("*").order("created_at", desc=True).limit(150).execute()
-                            data = res.data
+
+                            from core.database import execute
+                            res, err = execute(lambda c: c.table("chat_history")
+                                                 .select("*").order("created_at", desc=True).limit(150))
+                            if err:
+                                print(f"Error searching chat_history: {err}")
+                                data = []
+                            else:
+                                data = res.data if res and res.data else []
                             
                             filtered = []
                             if keywords:

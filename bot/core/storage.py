@@ -1,43 +1,70 @@
+"""
+storage.py — JSON blob storage trên Supabase (bảng json_storage).
+
+Cơ chế: dùng file_name làm khóa chính. Đọc/ghi có retry + validation cơ bản.
+Thay thế cơ chế sync GitHub cũ (đã bỏ — xem git history).
+"""
+from __future__ import annotations
+
+import json
+import logging
 import os
-from .config import BOT_SESSION_ID, GIT_URL
-from .database import supabase
+from typing import Any, Callable
 
-# ==============================================================================
-# CƠ CHẾ CHỐNG MẤT DỮ LIỆU - TỰ ĐỘNG ĐẨY LÊN SUPABASE
-# ==============================================================================
+from .db import safe_select, safe_upsert
 
-def sync_to_github():
-    pass
+logger = logging.getLogger("bot.storage")
 
-def restore_from_github():
-    pass
+TABLE = "json_storage"
 
-def load_json(path, default):
-    """Đọc dữ liệu từ bảng json_storage trên Supabase, dùng tên file làm khóa."""
+
+def load_json(path: str, default: Any | Callable[[], Any]) -> Any:
+    """Đọc JSON từ Supabase (key = basename(path)). Nếu thiếu → default."""
     filename = os.path.basename(path)
     try:
-        resp = supabase.table("json_storage").select("data").eq("file_name", filename).execute()
-        if resp.data:
-            return resp.data[0]["data"]
-    except Exception as e:
-        print(f"⚠️ [Data] Lỗi đọc {filename} từ Supabase: {e}")
-    
-    # Nếu chưa có trên Supabase, khởi tạo giá trị mặc định
+        data, err = safe_select(TABLE, columns="data",
+                                filters={"file_name": filename}, single=True)
+        if err:
+            logger.warning("load_json %s: %s", filename, err)
+        elif data is not None:
+            if isinstance(data, dict) and "data" in data:
+                return data["data"]
+            return data
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("load_json %s lỗi: %s", filename, exc)
+
+    # Fallback default
     return default() if callable(default) else default
 
-def save_json(data, path, sync_github=True):
-    """Lưu dữ liệu vào bảng json_storage trên Supabase."""
+
+def save_json(data: Any, path: str) -> bool:
+    """Lưu JSON lên Supabase. Trả True nếu thành công."""
     filename = os.path.basename(path)
+    if not isinstance(data, (dict, list)):
+        logger.error("save_json %s: data phải là dict/list, nhận %s",
+                     filename, type(data).__name__)
+        return False
+    # serialize test để bắt lỗi trước khi gửi
     try:
-        supabase.table("json_storage").upsert(
-            {"file_name": filename, "data": data},
-            on_conflict="file_name"
-        ).execute()
-        print(f"✅ [Data] Đã lưu {filename} lên Supabase.")
-    except Exception as e:
-        print(f"❌ [Data] Lỗi lưu {filename} lên Supabase: {e}")
+        json.dumps(data)
+    except (TypeError, ValueError) as exc:
+        logger.error("save_json %s: data không serialize được: %s", filename, exc)
+        return False
 
-def _trigger_sync():
-    pass
+    err = safe_upsert(TABLE, {"file_name": filename, "data": data},
+                      on_conflict="file_name")
+    if err:
+        logger.error("save_json %s thất bại: %s", filename, err)
+        return False
+    logger.info("save_json %s OK", filename)
+    return True
 
 
+def restore_from_github() -> None:
+    """No-op backward-compatible.
+
+    Trước đây (do bản cũ) hàm này kéo JSON data từ GitHub về trước khi load cog.
+    Cơ chế sync GitHub đã bỏ (dữ liệu giờ nằm trên Supabase json_storage).
+    Giữ hàm rỗng để main.py không bị ImportError. Không thực hiện network call.
+    """
+    logger.info("restore_from_github: no-op (data đã nằm trên Supabase)")

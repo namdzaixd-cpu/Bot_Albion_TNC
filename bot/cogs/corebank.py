@@ -7,32 +7,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import STORAGE_DIR
 from core.permissions import is_officer
-from core.storage import load_json, save_json
+from core.config_store import get_config, save_config, reload_all
+from core.database import execute
+from core.config import GUILD_ID
 
 # ==============================================================================
 # HỆ THỐNG CORE-BANK (Tích hợp UnbelievaBoat)
 # ==============================================================================
-CORECONFIG_FILE = os.path.join(STORAGE_DIR, "tnc_coreconfig_v1.json")
-CORE_CREDITED_FILE = os.path.join(STORAGE_DIR, "tnc_core_credited_v1.json")
-
-
-def load_coreconfig():
-    return load_json(CORECONFIG_FILE, lambda: {"core_channel_id": "", "bank_channel_id": "", "unbelievaboat_token": "", "emoji_map": {}, "auto_react": True})
-
-
-def save_coreconfig(data):
-    save_json(data, CORECONFIG_FILE)
-
-
-def load_core_credited():
-    return load_json(CORE_CREDITED_FILE, dict)
-
-
-def save_core_credited(data):
-    save_json(data, CORE_CREDITED_FILE)
-
 
 def parse_emoji_input(emoji_str: str):
     """Phân tích chuỗi emoji từ lệnh slash.
@@ -47,15 +29,50 @@ def parse_emoji_input(emoji_str: str):
         return eid, f"<:{name}:{eid}>"
     return emoji_str, emoji_str
 
-
 def get_reaction_key(emoji) -> str:
     """Lấy key nhất quán cho emoji reaction (PartialEmoji)."""
     return str(emoji.id) if emoji.id else emoji.name
 
-
 class CoreBankCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.config = {}
+        self._reload_config()
+
+    def _reload_config(self):
+        try:
+            default_config = {
+                "guild_id": str(GUILD_ID),
+                "core_channel_id": "",
+                "bank_channel_id": "",
+                "unbelievaboat_token": "",
+                "emoji_map": {},
+                "auto_react": True,
+            }
+            data = get_config(
+                "corebank_config", str(GUILD_ID), default=default_config
+            )
+            # Đảm bảo các trường thiếu có giá trị mặc định
+            merged = {**default_config, **(data or {})}
+            self.config = merged
+        except Exception as e:
+            print(f"⚠️ [Core-Bank] Lỗi khi load config: {e}")
+            self.config = {
+                "core_channel_id": "", "bank_channel_id": "",
+                "unbelievaboat_token": "", "emoji_map": {}, "auto_react": True,
+            }
+
+    def _save_config(self):
+        try:
+            self.config["guild_id"] = str(GUILD_ID)
+            save_config("corebank_config", self.config, on_conflict="guild_id")
+        except Exception as e:
+            print(f"⚠️ [Core-Bank] Lỗi khi save config: {e}")
+
+    @commands.Cog.listener()
+    async def on_config_reload(self):
+        self._reload_config()
+        print("✅ Đã cập nhật cấu hình CoreBank từ Dashboard!")
 
     # ── Tự động react vào ảnh trong kênh Core ───────────────────────────────
     @commands.Cog.listener()
@@ -63,7 +80,7 @@ class CoreBankCog(commands.Cog):
         if message.author.bot:
             return
         try:
-            core_config = load_coreconfig()
+            core_config = self.config
             if core_config.get("auto_react", True):
                 core_ch_id = core_config.get("core_channel_id")
                 is_core = str(message.channel.id) == core_ch_id
@@ -135,11 +152,10 @@ class CoreBankCog(commands.Cog):
                              token: str):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
-        config = load_coreconfig()
-        config["core_channel_id"] = str(core_channel.id)
-        config["bank_channel_id"] = str(bank_channel.id)
-        config["unbelievaboat_token"] = token
-        save_coreconfig(config)
+        self.config["core_channel_id"] = str(core_channel.id)
+        self.config["bank_channel_id"] = str(bank_channel.id)
+        self.config["unbelievaboat_token"] = token
+        self._save_config()
         await interaction.response.send_message(
             f"✅ Đã cài đặt Core-Bank:\n"
             f"📸 Core channel: {core_channel.mention}\n"
@@ -172,7 +188,6 @@ class CoreBankCog(commands.Cog):
                 ephemeral=True
             )
 
-        config = load_coreconfig()
         results, errors = [], []
 
         for i in range(count):
@@ -183,13 +198,13 @@ class CoreBankCog(commands.Cog):
                     continue
                 o = int(orders[i]) if i < len(orders) and orders[i] else 0
                 key, display = parse_emoji_input(emojis[i])
-                config.setdefault("emoji_map", {})[key] = {"name": names[i], "value": v, "display": display, "order": o}
+                self.config.setdefault("emoji_map", {})[key] = {"name": names[i], "value": v, "display": display, "order": o}
                 results.append(f"✅ {display} **{names[i]}** — {v:,} silver (STT: {o})")
             except ValueError:
                 errors.append(f"❌ `{values[i]}`: giá trị không hợp lệ")
 
         if results:
-            save_coreconfig(config)
+            self._save_config()
 
         lines = results + errors
         msg = "\n".join(lines) if lines else "⚠️ Không có gì được thêm."
@@ -204,12 +219,11 @@ class CoreBankCog(commands.Cog):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
         key, display = parse_emoji_input(emoji)
-        config = load_coreconfig()
-        emoji_map = config.get("emoji_map", {})
+        emoji_map = self.config.get("emoji_map", {})
         if key not in emoji_map:
             return await interaction.response.send_message(f"❓ Không tìm thấy emoji `{display}` trong danh sách.", ephemeral=True)
         removed = emoji_map.pop(key)
-        save_coreconfig(config)
+        self._save_config()
         await interaction.response.send_message(
             f"🗑️ Đã xóa: {display} = **{removed['name']}** ({removed['value']:,} silver)",
             ephemeral=True
@@ -220,20 +234,18 @@ class CoreBankCog(commands.Cog):
     async def coreautoreact_cmd(self, interaction: discord.Interaction, enable: bool):
         if not is_officer(interaction.user):
             return await interaction.response.send_message("❌ Chỉ Officer mới dùng được!", ephemeral=True)
-        config = load_coreconfig()
-        config["auto_react"] = enable
-        save_coreconfig(config)
+        self.config["auto_react"] = enable
+        self._save_config()
         state = "BẬT ✅" if enable else "TẮT ❌"
         await interaction.response.send_message(f"⚙️ Tự động thả emoji vào ảnh trong kênh Core: **{state}**", ephemeral=True)
 
     @app_commands.command(name="corelist", description="Xem danh sách emoji Core và cấu hình hiện tại")
     async def corelist_cmd(self, interaction: discord.Interaction):
-        config = load_coreconfig()
-        emoji_map = config.get("emoji_map", {})
-        core_ch = config.get("core_channel_id")
-        bank_ch = config.get("bank_channel_id")
-        token = config.get("unbelievaboat_token", "")
-        auto_react = config.get("auto_react", True)
+        emoji_map = self.config.get("emoji_map", {})
+        core_ch = self.config.get("core_channel_id")
+        bank_ch = self.config.get("bank_channel_id")
+        token = self.config.get("unbelievaboat_token", "")
+        auto_react = self.config.get("auto_react", True)
 
         embed = discord.Embed(title="⚙️ Cấu hình Core-Bank", color=0xf1c40f)
         embed.add_field(
@@ -260,10 +272,9 @@ class CoreBankCog(commands.Cog):
         if payload.user_id == self.bot.user.id:
             return
 
-        config = load_coreconfig()
-        core_ch_id = config.get("core_channel_id")
-        bank_ch_id = config.get("bank_channel_id")
-        emoji_map = config.get("emoji_map", {})
+        core_ch_id = self.config.get("core_channel_id")
+        bank_ch_id = self.config.get("bank_channel_id")
+        emoji_map = self.config.get("emoji_map", {})
 
         # Chỉ xử lý trong kênh core đã cài hoặc thread thuộc kênh core
         if not core_ch_id:
@@ -280,7 +291,6 @@ class CoreBankCog(commands.Cog):
             except Exception as e:
                 print(f"[Error] {e}")
                 return
-
             
         is_core = str(payload.channel_id) == core_ch_id
         if not is_core and hasattr(channel, "parent_id"):
@@ -293,23 +303,23 @@ class CoreBankCog(commands.Cog):
         if emoji_key not in emoji_map:
             return
 
-        guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
-            return
         reactor = guild.get_member(payload.user_id)
         if not reactor or not is_officer(reactor):
             return  # Không phải Officer → bỏ qua
 
-        # Kiểm tra chống cộng trùng
-        credited = load_core_credited()
+        # Kiểm tra chống cộng trùng trong Supabase
         credit_key = f"{payload.message_id}:{emoji_key}"
-        if credit_key in credited:
-            return  # Đã cộng rồi, Officer khác react sau → bỏ qua
+        try:
+            res, err = execute(lambda c: c.table("core_credited").select("*").eq("message_id", credit_key))
+            if err:
+                print(f"Lỗi truy vấn core_credited: {err}")
+            elif res and res.data:
+                return  # Đã cộng rồi, Officer khác react sau → bỏ qua
+        except Exception as e:
+            print(f"Lỗi truy vấn core_credited: {e}")
+            pass
 
         # Lấy tin nhắn gốc để tìm ra member đã đăng ảnh
-        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
-        if not channel:
-            return
         try:
             message = await channel.fetch_message(payload.message_id)
         except Exception as e:
@@ -343,20 +353,23 @@ class CoreBankCog(commands.Cog):
             )
             return
 
-        # Ghi nhận trước để tránh race condition giữa 2 Officer react nhanh
-        credited[credit_key] = {
-            "officer_id": str(reactor.id),
-            "member_id": str(author.id),
-            "core_name": core_name,
-            "value": core_value,
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        save_core_credited(credited)
+        # Ghi nhận trước vào Supabase để tránh race condition
+        try:
+            _, err = execute(lambda c: c.table("core_credited").insert({
+                "message_id": credit_key,
+                "user_id": str(reactor.id),  # Ở đây mình lưu người react để biết ai cộng
+                "amount": core_value
+            }))
+            if err:
+                print(f"Lỗi ghi core_credited: {err}")
+        except Exception as e:
+            print(f"Lỗi ghi core_credited: {e}")
+            pass
 
         # Xử lý API UnbelievaBoat
-        token = config.get("unbelievaboat_token")
+        token = self.config.get("unbelievaboat_token")
         if not token:
-            await channel.send("⚠️ Chưa cài UnbelievaBoat API Token! Hãy dùng `/coretoken`.", reference=message)
+            await channel.send("⚠️ Chưa cài UnbelievaBoat API Token! Hãy dùng `/coresetup`.", reference=message)
             return
 
         api_url = f"https://unbelievaboat.com/api/v1/guilds/{payload.guild_id}/users/{author.id}"
@@ -386,10 +399,9 @@ class CoreBankCog(commands.Cog):
         if payload.user_id == self.bot.user.id:
             return
 
-        config = load_coreconfig()
-        core_ch_id = config.get("core_channel_id")
-        bank_ch_id = config.get("bank_channel_id")
-        emoji_map = config.get("emoji_map", {})
+        core_ch_id = self.config.get("core_channel_id")
+        bank_ch_id = self.config.get("bank_channel_id")
+        emoji_map = self.config.get("emoji_map", {})
 
         if not core_ch_id:
             return
@@ -405,7 +417,6 @@ class CoreBankCog(commands.Cog):
             except Exception as e:
                 print(f"[Error] {e}")
                 return
-
             
         is_core = str(payload.channel_id) == core_ch_id
         if not is_core and hasattr(channel, "parent_id"):
@@ -418,35 +429,65 @@ class CoreBankCog(commands.Cog):
         if emoji_key not in emoji_map:
             return
 
-        credited = load_core_credited()
         credit_key = f"{payload.message_id}:{emoji_key}"
-        if credit_key not in credited:
-            return  # Chưa từng cộng → không cần hoàn lại
+        
+        entry = None
+        try:
+            res, err = execute(lambda c: c.table("core_credited").select("*").eq("message_id", credit_key))
+            if err:
+                print(f"Lỗi kiểm tra core_credited khi remove: {err}")
+                return
+            if not res or not res.data:
+                return # Chưa từng cộng
+            entry = res.data[0]
+        except Exception as e:
+            print(f"Lỗi kiểm tra core_credited khi remove: {e}")
+            return
 
-        entry = credited[credit_key]
         # Chỉ hoàn lại nếu chính Officer đó gỡ react
-        if str(payload.user_id) != entry["officer_id"]:
+        if str(payload.user_id) != entry["user_id"]:
             return
 
-        del credited[credit_key]
-        save_core_credited(credited)
-
-        guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
-            return
+        # Xóa record
+        try:
+            _, err = execute(lambda c: c.table("core_credited").delete().eq("message_id", credit_key))
+            if err:
+                print(f"Lỗi xóa core_credited: {err}")
+        except Exception as e:
+            print(f"Lỗi xóa core_credited: {e}")
+            pass
 
         core_info = emoji_map[emoji_key]
         core_value = core_info["value"]
         core_name = core_info["name"]
         core_disp = core_info.get("display", emoji_key)
-        member = guild.get_member(int(entry["member_id"]))
-        member_mention = member.mention if member else f"<@{entry['member_id']}>"
+        
+        # Tìm lại author
+        member_id = None
+        try:
+            message = await channel.fetch_message(payload.message_id)
+            author = message.author
+            if author.id == self.bot.user.id and "Ảnh tách ra từ <@" in message.content:
+                match = re.search(r"Ảnh tách ra từ <@!?(\d+)>", message.content)
+                if match:
+                    member_id = int(match.group(1))
+            else:
+                member_id = author.id
+        except Exception as e:
+            print(f"[Error] fetch message on revert: {e}")
+            return
+            
+        if not member_id:
+            return
+            
+        member = guild.get_member(member_id)
+        member_mention = member.mention if member else f"<@{member_id}>"
         reactor = guild.get_member(payload.user_id)
         reactor_mention = reactor.mention if reactor else f"<@{payload.user_id}>"
 
-        token = config.get("unbelievaboat_token")
+        token = self.config.get("unbelievaboat_token")
         if token:
-            api_url = f"https://unbelievaboat.com/api/v1/guilds/{payload.guild_id}/users/{entry['member_id']}"
+            api_url = f"https://unbelievaboat.com/api/v1/guilds/{payload.guild_id}/users/{member_id}"
             headers = {"Authorization": token}
             payload_data = {"bank": -core_value, "reason": f"CoreBank Revert: {core_name}"}
             try:
@@ -454,13 +495,11 @@ class CoreBankCog(commands.Cog):
                     async with session.patch(api_url, headers=headers, json=payload_data):
                         pass
             except Exception as e:
-                print(f"[Error] {e}")
+                print(f"[Error] revert API: {e}")
                 pass
 
-        channel = guild.get_channel(payload.channel_id) or guild.get_thread(payload.channel_id)
         if channel:
             try:
-                message = await channel.fetch_message(payload.message_id)
                 await channel.send(
                     f"↩️ **Hoàn tác** {core_disp} {core_name} — Đã trừ lại **{core_value:,} silver** của {member_mention}\n"
                     f"_Gỡ bởi {reactor_mention}_",
