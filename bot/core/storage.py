@@ -58,3 +58,13 @@ def save_json(data: Any, path: str) -> bool:
         return False
     logger.info("save_json %s OK", filename)
     return True
+
+
+def restore_from_github() -> None:
+    """No-op backward-compatible.
+
+    Trước đây (do bản cũ) hàm này kéo JSON data từ GitHub về trước khi load cog.
+    Cơ chế sync GitHub đã bỏ (dữ liệu giờ nằm trên Supabase json_storage).
+    Giữ hàm rỗng để main.py không bị ImportError. Không thực hiện network call.
+    """
+    logger.info("restore_from_github: no-op (data đã nằm trên Supabase)")

@@ -6,19 +6,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from core.config import STORAGE_DIR, GUILD_NAME, GUILD_TAG, GUILD_ID, SUPABASE_URL, SUPABASE_KEY
+from core.config import STORAGE_DIR, GUILD_NAME, GUILD_TAG, GUILD_ID
 from core.storage import load_json, save_json
 from core.permissions import is_officer
-from supabase import create_client
-
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"⚠️ Không thể khởi tạo Supabase client: {e}")
-else:
-    print("⚠️ WARNING: Chưa cấu hình Supabase URL hoặc Key. Tính năng Onboarding qua Supabase sẽ bị tắt.")
+from core.database import execute
 
 class OnboardConfig:
     def __init__(self):
@@ -27,12 +18,17 @@ class OnboardConfig:
         
     def _fetch_data(self):
         try:
-            response = supabase.table("guild_config").select("*").eq("guild_id", self.guild_id).execute()
-            if response.data:
+            response, err = execute(lambda c: c.table("guild_config").select("*").eq("guild_id", self.guild_id))
+            if err:
+                print(f"Error fetching supabase config: {err}")
+                return {"is_onboard_enabled": True}
+            if response and response.data:
                 return response.data[0]
             else:
                 default_data = {"guild_id": self.guild_id, "is_onboard_enabled": True}
-                supabase.table("guild_config").insert(default_data).execute()
+                _, err2 = execute(lambda c: c.table("guild_config").insert(default_data))
+                if err2:
+                    print(f"Error inserting default guild_config: {err2}")
                 return default_data
         except Exception as e:
             print(f"Error fetching supabase config: {e}")
@@ -41,7 +37,9 @@ class OnboardConfig:
     def save(self):
         try:
             update_data = {k: v for k, v in self.data.items() if k != "guild_id"}
-            supabase.table("guild_config").update(update_data).eq("guild_id", self.guild_id).execute()
+            _, err = execute(lambda c: c.table("guild_config").update(update_data).eq("guild_id", self.guild_id))
+            if err:
+                print(f"Error saving supabase config: {err}")
         except Exception as e:
             print(f"Error saving supabase config: {e}")
 
@@ -412,6 +410,7 @@ class Onboarding(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        print(f"DEBUG Onboarding: on_message triggered. is_enabled: {self.config.is_enabled}")
         if not self.config.is_enabled: return
         if message.author.bot: return
         if not isinstance(message.channel, discord.Thread): return
