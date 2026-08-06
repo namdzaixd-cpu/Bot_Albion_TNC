@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from core.permissions import is_officer
-from core.database import supabase
+from core.database import execute
 
 # ==============================================================================
 # HỆ THỐNG PHÂN TÍCH ĐIỂM SIPHONED (LOG ANALYZER)
@@ -17,12 +17,16 @@ from core.database import supabase
 def load_sp():
     data = {"history": {}, "last_update": "Chưa có dữ liệu"}
     try:
-        meta_resp = supabase.table("sp_metadata").select("last_update").eq("id", 1).execute()
-        if meta_resp.data:
+        meta_resp, err = execute(lambda c: c.table("sp_metadata").select("last_update").eq("id", 1))
+        if err:
+            print(f"Error loading SP metadata: {err}")
+        elif meta_resp and meta_resp.data:
             data["last_update"] = meta_resp.data[0]["last_update"]
 
-        history_resp = supabase.table("user_economy").select("user_id, silver_pieces").execute()
-        if history_resp.data:
+        history_resp, err2 = execute(lambda c: c.table("user_economy").select("user_id, silver_pieces"))
+        if err2:
+            print(f"Error loading SP history: {err2}")
+        elif history_resp and history_resp.data:
             for row in history_resp.data:
                 data["history"][row["user_id"]] = row["silver_pieces"]
     except Exception as e:
@@ -31,13 +35,18 @@ def load_sp():
 
 def save_sp(data):
     try:
-        supabase.table("sp_metadata").upsert({"id": 1, "last_update": data.get("last_update", "N/A")}).execute()
+        _, err = execute(lambda c: c.table("sp_metadata").upsert(
+            {"id": 1, "last_update": data.get("last_update", "N/A")}))
+        if err:
+            print(f"Error saving sp_metadata: {err}")
 
         records = [{"user_id": user, "silver_pieces": sp} for user, sp in data.get("history", {}).items()]
         if records:
             chunk_size = 1000
             for i in range(0, len(records), chunk_size):
-                supabase.table("user_economy").upsert(records[i:i+chunk_size]).execute()
+                _, err = execute(lambda c: c.table("user_economy").upsert(records[i:i+chunk_size]))
+                if err:
+                    print(f"Error saving user_economy chunk: {err}")
     except Exception as e:
         print(f"Error saving SP to Supabase: {e}")
 
@@ -47,23 +56,33 @@ def save_transactions(rows: list[dict]):
         if rows:
             chunk_size = 1000
             for i in range(0, len(rows), chunk_size):
-                supabase.table("sp_transactions").insert(rows[i:i+chunk_size]).execute()
+                _, err = execute(lambda c: c.table("sp_transactions").insert(rows[i:i+chunk_size]))
+                if err:
+                    print(f"Error inserting sp_transactions: {err}")
         # Dọn dẹp record cũ hơn 1 năm
         cutoff = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
-        supabase.table("sp_transactions").delete().lt("inserted_at", cutoff).execute()
+        _, err = execute(lambda c: c.table("sp_transactions").delete().lt("inserted_at", cutoff))
+        if err:
+            print(f"Error cleaning sp_transactions: {err}")
     except Exception as e:
         print(f"Error saving sp_transactions: {e}")
 
 def delete_sp_user(user_id):
     try:
-        supabase.table("user_economy").delete().eq("user_id", user_id).execute()
+        _, err = execute(lambda c: c.table("user_economy").delete().eq("user_id", user_id))
+        if err:
+            print(f"Error deleting user {user_id}: {err}")
     except Exception as e:
         print(f"Error deleting user {user_id} from Supabase: {e}")
 
 def reset_sp_history():
     try:
-        supabase.table("user_economy").delete().neq("user_id", "").execute()
-        supabase.table("sp_metadata").upsert({"id": 1, "last_update": "N/A"}).execute()
+        _, err = execute(lambda c: c.table("user_economy").delete().neq("user_id", ""))
+        if err:
+            print(f"Error resetting user_economy: {err}")
+        _, err2 = execute(lambda c: c.table("sp_metadata").upsert({"id": 1, "last_update": "N/A"}))
+        if err2:
+            print(f"Error resetting sp_metadata: {err2}")
     except Exception as e:
         print(f"Error resetting SP history: {e}")
 
@@ -253,16 +272,17 @@ class SiphonedCog(commands.Cog):
     async def sphistory(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
         try:
-            resp = supabase.table("sp_transactions") \
-                .select("amount, log_timestamp") \
-                .eq("player_name", player) \
-                .order("log_timestamp", desc=True) \
-                .limit(20) \
-                .execute()
+            resp, err = execute(lambda c: c.table("sp_transactions")
+                .select("amount, log_timestamp")
+                .eq("player_name", player)
+                .order("log_timestamp", desc=True)
+                .limit(20))
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {err}")
         except Exception as e:
             return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {e}")
 
-        rows = resp.data if resp.data else []
+        rows = resp.data if resp and resp.data else []
         if not rows:
             return await interaction.followup.send(
                 f"❓ Không tìm thấy lịch sử đóng góp nào của `{player}`.\n"
@@ -299,16 +319,20 @@ class SiphonedCog(commands.Cog):
         period_label = {"30d": "30 ngày", "90d": "3 tháng", "6m": "6 tháng", "all": "Toàn bộ lịch sử"}
 
         try:
-            query = supabase.table("sp_transactions").select("player_name, amount")
-            if period != "all":
-                days = period_map[period]
-                cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-                query = query.gte("inserted_at", cutoff)
-            resp = query.execute()
+            def build(c):
+                q = c.table("sp_transactions").select("player_name, amount")
+                if period != "all":
+                    days = period_map[period]
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                    q = q.gte("inserted_at", cutoff)
+                return q
+            resp, err = execute(build)
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {err}")
         except Exception as e:
             return await interaction.followup.send(f"❌ Lỗi khi truy vấn dữ liệu: {e}")
 
-        rows = resp.data if resp.data else []
+        rows = resp.data if resp and resp.data else []
         if not rows:
             return await interaction.followup.send(
                 f"📊 Không có dữ liệu trong **{period_label[period]}**.\n"
@@ -337,15 +361,16 @@ class SiphonedCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            resp = supabase.table("sp_transactions") \
-                .select("log_timestamp, inserted_at") \
-                .order("inserted_at", desc=True) \
-                .limit(200) \
-                .execute()
+            resp, err = execute(lambda c: c.table("sp_transactions")
+                .select("log_timestamp, inserted_at")
+                .order("inserted_at", desc=True)
+                .limit(200))
+            if err:
+                return await interaction.followup.send(f"❌ Lỗi khi truy vấn: {err}")
         except Exception as e:
             return await interaction.followup.send(f"❌ Lỗi khi truy vấn: {e}")
 
-        rows = resp.data if resp.data else []
+        rows = resp.data if resp and resp.data else []
         if not rows:
             return await interaction.followup.send("📋 Chưa có audit log nào.")
 

@@ -10,7 +10,7 @@ from gtts import gTTS
 
 from core.config import DATA_DIR
 from core.permissions import is_officer
-from core.database import supabase
+from core.database import execute
 
 # ==============================================================================
 # HỆ THỐNG TTS VOICE "ALO" (Bot join voice, đọc chat bằng giọng Google TTS)
@@ -25,8 +25,10 @@ URL_RE = re.compile(r"https?://\S+")
 def load_tts_config():
     data = {"read_name": {}, "rejoin": {}}
     try:
-        resp = supabase.table("alo_tts_config").select("*").eq("id", 1).execute()
-        if resp.data:
+        resp, err = execute(lambda c: c.table("alo_tts_config").select("*").eq("id", 1))
+        if err:
+            print(f"Error loading alo_tts_config: {err}")
+        elif resp and resp.data:
             row = resp.data[0]
             data["read_name"] = row.get("read_name", {})
             data["rejoin"] = row.get("rejoin", {})
@@ -42,7 +44,9 @@ def save_tts_config(data):
             "read_name": data.get("read_name", {}),
             "rejoin": data.get("rejoin", {})
         }
-        supabase.table("alo_tts_config").upsert(record).execute()
+        _, err = execute(lambda c: c.table("alo_tts_config").upsert(record))
+        if err:
+            print(f"Error saving alo_tts_config: {err}")
     except Exception as e:
         print(f"Error saving alo_tts_config to Supabase: {e}")
 

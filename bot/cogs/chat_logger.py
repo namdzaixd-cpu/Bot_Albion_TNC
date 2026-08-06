@@ -1,15 +1,7 @@
 import discord
 from discord.ext import commands, tasks
-from core.config import SUPABASE_URL, SUPABASE_KEY
-from supabase import create_client
+from core.database import execute
 import datetime
-
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"⚠️ Không thể khởi tạo Supabase client trong chat_logger: {e}")
 
 class ChatLogger(commands.Cog):
     def __init__(self, bot):
@@ -30,10 +22,7 @@ class ChatLogger(commands.Cog):
             return
             
         # Bỏ qua các tin nhắn gọi lệnh (bắt đầu bằng /, !, .) để tiết kiệm dung lượng
-        if message.content.startswith(("!", "/", ".")):
-            return
-
-        if not supabase: 
+        if message.content.startswith(("/", ".", "!")):
             return
 
         if not message.guild:
@@ -47,18 +36,22 @@ class ChatLogger(commands.Cog):
             if channel_id not in self.known_channels:
                 try:
                     # Upsert Guild Config (to ensure FK is valid)
-                    supabase.table("guild_config").upsert(
-                        {"guild_id": guild_id}, 
-                        on_conflict="guild_id"
-                    ).execute()
+                    _, err = execute(lambda c: c.table("guild_config").upsert(
+                        {"guild_id": guild_id}, on_conflict="guild_id"))
+                    if err:
+                        print(f"Lỗi Upsert Guild: {err}")
+                        return
                     
                     # Upsert Discord Channels (to ensure FK is valid)
-                    supabase.table("discord_channels").upsert({
+                    _, err2 = execute(lambda c: c.table("discord_channels").upsert({
                         "id": channel_id,
                         "guild_id": guild_id,
                         "name": getattr(message.channel, "name", "unknown"),
                         "type": str(getattr(message.channel, "type", "text"))
-                    }, on_conflict="id").execute()
+                    }, on_conflict="id"))
+                    if err2:
+                        print(f"Lỗi Upsert Channel: {err2}")
+                        return
                     
                     self.known_channels.add(channel_id)
                 except Exception as e:
@@ -82,21 +75,25 @@ class ChatLogger(commands.Cog):
     async def _insert_log(self, data):
         try:
             # Insert log âm thầm
-            supabase.table("chat_history").insert(data).execute()
-        except Exception as e:
-            pass # Bỏ qua lỗi ngầm để tránh spam console khi DB lỗi
+            _, err = execute(lambda c: c.table("chat_history").insert(data))
+            if err:
+                pass  # Bỏ qua lỗi ngầm để tránh spam console khi DB lỗi
+        except Exception:
+            pass  # Bỏ qua lỗi ngầm để tránh spam console khi DB lỗi
 
     @tasks.loop(hours=24)
     async def cleanup_old_messages(self):
-        """Tự động xoá tin nhắn cũ hơn 7 ngày để tiết kiệm dung lượng 0đ"""
-        if not supabase: return
+        """Tự động xoá tin nhắn cũ hơn 7 ngày để tiết kiệm dung lượng."""
         try:
             # Lấy mốc thời gian 7 ngày trước
-            seven_days_ago = (datetime.datetime.now(pytz.UTC) - datetime.timedelta(days=7)).isoformat()
+            seven_days_ago = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).isoformat()
             
             # Thực thi xoá
-            supabase.table("chat_history").delete().lte("created_at", seven_days_ago).execute()
-            print(f"🧹 Đã chạy tác vụ dọn dẹp tin nhắn chat cũ hơn 7 ngày trên Supabase (Dự án 0đ).")
+            _, err = execute(lambda c: c.table("chat_history").delete().lte("created_at", seven_days_ago))
+            if err:
+                print(f"Lỗi khi dọn dẹp tin nhắn cũ: {err}")
+                return
+            print(f"🧹 Đã chạy tác vụ dọn dẹp tin nhắn chat cũ hơn 7 ngày trên Supabase.")
         except Exception as e:
             print(f"Lỗi khi dọn dẹp tin nhắn cũ: {e}")
 

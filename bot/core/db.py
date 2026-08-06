@@ -167,3 +167,25 @@ def safe_update(table: str, row: dict, *,
     except Exception as e:  # noqa: BLE001
         logger.exception("safe_update lỗi không mong đợi: %s", e)
         return str(e)
+
+
+def execute(query_builder: Callable[[Client], Any]) -> tuple[Optional[Any], Optional[str]]:
+    """Chạy 1 query builder (hàm nhận client → trả query object) với retry.
+
+    Dùng cho các thao tác phức tạp (bulk upsert, delete, order/limit):
+        data, err = execute(lambda c: c.table("x").select("*").execute())
+    """
+    client = get_client()
+    if client is None:
+        return (None, "client_unavailable")
+    try:
+        res = _with_retry(lambda: query_builder(client).execute())
+        if getattr(res, "error", None):
+            return (None, str(res.error))
+        return (res, None)
+    except DBError as e:
+        return (None, str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.exception("execute lỗi không mong đợi: %s", e)
+        return (None, str(e))
+
