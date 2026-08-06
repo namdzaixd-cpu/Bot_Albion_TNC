@@ -176,8 +176,9 @@ class SiphonedCog(commands.Cog):
         if new_latest_time is None:
             return await interaction.followup.send("❌ Không đọc được mốc thời gian hợp lệ từ file log!")
 
-        # Bước 2: Chặn nếu file cũ hơn hoặc trùng mốc đã lưu
+        # Bước 2: Chặn nếu file cũ hơn hoặc trùng mốc đã lưu — parse old_last_update để dùng lại ở bước 3
         old_last_update_str = data.get("last_update", None)
+        old_last_update = None
         if old_last_update_str and old_last_update_str not in ("Chưa có dữ liệu", "N/A"):
             try:
                 old_last_update = datetime.strptime(old_last_update_str, "%Y-%m-%d %H:%M:%S")
@@ -192,7 +193,9 @@ class SiphonedCog(commands.Cog):
                 pass
 
         # Bước 3: Xử lý cộng điểm + thu thập transactions
+        # Mỗi dòng được parse timestamp riêng → bỏ qua dòng nào <= old_last_update (tránh double count khi file overlap)
         count = 0
+        skipped = 0
         time_set = False
         transactions = []
         for line in lines:
@@ -200,6 +203,14 @@ class SiphonedCog(commands.Cog):
                 continue
             parts = [p.strip().replace('"', '') for p in line.split('\t') if p.strip()]
             if len(parts) >= 4:
+                try:
+                    line_ts = datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    continue
+                # Bỏ qua dòng đã nằm trong vùng đã cộng trước đó
+                if old_last_update and line_ts <= old_last_update:
+                    skipped += 1
+                    continue
                 if not time_set:
                     data["last_update"] = parts[0]
                     time_set = True
@@ -207,14 +218,10 @@ class SiphonedCog(commands.Cog):
                     player_name = parts[1]
                     amount = int(parts[3])
                     data["history"][player_name] = data["history"].get(player_name, 0) + amount
-                    try:
-                        log_ts = datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S").isoformat()
-                    except ValueError:
-                        log_ts = datetime.now(timezone.utc).isoformat()
                     transactions.append({
                         "player_name": player_name,
                         "amount": amount,
-                        "log_timestamp": log_ts,
+                        "log_timestamp": line_ts.isoformat(),
                     })
                     count += 1
                 except ValueError:
@@ -222,8 +229,9 @@ class SiphonedCog(commands.Cog):
 
         save_sp(data)
         save_transactions(transactions)
+        overlap_note = f"\n⏩ Bỏ qua **{skipped}** dòng overlap (đã cộng trước đó)" if skipped > 0 else ""
         await interaction.followup.send(
-            f"✅ Xử lý thành công **{count}** dòng dữ liệu log.\n"
+            f"✅ Xử lý thành công **{count}** dòng dữ liệu mới.{overlap_note}\n"
             f"Mốc log: `{data['last_update']}` (Đã lưu lên Supabase + ghi lịch sử)"
         )
 
