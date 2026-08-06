@@ -116,21 +116,21 @@ export default function Dashboard() {
     <div className="flex h-screen bg-background overflow-hidden">
       <CommandPalette onSelect={setActiveModule} />
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-20' : 'w-72'} border-r border-border bg-surface/30 backdrop-blur-md flex flex-col transition-all duration-300`}>
-        <div className="h-16 flex items-center px-6 border-b border-border/50 justify-between">
-          <Link href="/" className="flex items-center gap-3 text-text-muted hover:text-white transition-colors">
+      <aside className={`${collapsed ? 'w-20' : 'w-72'} border-r border-[rgba(168,85,247,.15)] bg-[rgba(20,18,31,.5)] backdrop-blur-xl flex flex-col transition-all duration-300 relative z-10`}>
+        <div className="h-16 flex items-center px-6 border-b border-[rgba(168,85,247,.12)] justify-between">
+          <Link href="/" className="flex items-center gap-3 text-[#8b8499] hover:text-white transition-colors">
             <ChevronLeft className="w-5 h-5" />
             {!collapsed && <span className="font-semibold text-sm">Về trang chủ</span>}
           </Link>
-          <button onClick={() => setCollapsed((c) => !c)} className="text-text-muted hover:text-white transition-colors" title="Thu gọn">
+          <button onClick={() => setCollapsed((c) => !c)} className="text-[#8b8499] hover:text-[#d8b4fe] transition-colors" title="Thu gọn">
             {collapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
           </button>
         </div>
 
         <div className="p-6">
-          <h2 className={`text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
-            <LayoutDashboard className="w-4 h-4" />
-            {!collapsed && "Guild Assistant Bot"}
+          <h2 className={`text-xs font-bold text-[#8b8499] uppercase tracking-wider mb-4 flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
+            <LayoutDashboard className="w-4 h-4" style={{ color: "#a855f7" }} />
+            {!collapsed && <span className="neon-purple">Guild Assistant</span>}
           </h2>
           <nav className="space-y-2">
             {MODULES.map((mod) => (
@@ -139,11 +139,11 @@ export default function Dashboard() {
                 onClick={() => setActiveModule(mod.id)}
                 title={collapsed ? mod.name : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${collapsed ? 'justify-center' : ''} ${activeModule === mod.id
-                    ? 'bg-primary/20 text-primary font-semibold shadow-[inset_0_0_15px_rgba(99,102,241,0.2)] border border-primary/30'
-                    : 'text-text-muted hover:bg-surface hover:text-white border border-transparent'
+                    ? 'bg-[rgba(168,85,247,.18)] text-[#d8b4fe] font-semibold shadow-[0_0_20px_rgba(168,85,247,.35)] border border-[rgba(168,85,247,.4)]'
+                    : 'text-[#8b8499] hover:bg-[rgba(168,85,247,.08)] hover:text-white border border-transparent'
                   }`}
               >
-                <mod.icon className={`w-5 h-5 ${activeModule === mod.id ? 'text-primary' : 'text-text-muted'}`} />
+                <mod.icon className={`w-5 h-5 ${activeModule === mod.id ? 'text-[#d8b4fe]' : 'text-[#8b8499]'}`} />
                 {!collapsed && <span className="text-sm">{mod.name}</span>}
               </button>
             ))}
@@ -163,14 +163,35 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col bg-background/50 relative">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-5 pointer-events-none"></div>
+      <main className="flex-1 flex flex-col bg-transparent relative">
+        {/* floating particles (fixed seed, no random to avoid hydration mismatch) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          {[
+            { l: 12, w: 5, h: 6, d: 14, delay: 1 },
+            { l: 28, w: 7, h: 5, d: 18, delay: 3 },
+            { l: 45, w: 4, h: 7, d: 12, delay: 0.5 },
+            { l: 63, w: 6, h: 6, d: 16, delay: 2 },
+            { l: 78, w: 5, h: 5, d: 13, delay: 4 },
+            { l: 88, w: 7, h: 6, d: 17, delay: 1.5 },
+            { l: 5, w: 6, h: 5, d: 15, delay: 3.5 },
+            { l: 35, w: 5, h: 7, d: 19, delay: 2.5 },
+            { l: 55, w: 7, h: 6, d: 11, delay: 0.8 },
+            { l: 72, w: 4, h: 5, d: 14, delay: 4.2 },
+            { l: 18, w: 6, h: 6, d: 16, delay: 1.2 },
+            { l: 92, w: 5, h: 7, d: 13, delay: 3.8 },
+            { l: 50, w: 7, h: 5, d: 18, delay: 0.3 },
+            { l: 68, w: 5, h: 6, d: 15, delay: 2.7 },
+          ].map((p, i) => (
+            <span key={i} className="particle"
+              style={{ left: `${p.l}%`, width: p.w, height: p.h, animationDuration: `${p.d}s`, animationDelay: `${p.delay}s` }} />
+          ))}
+        </div>
 
         {/* Header */}
-        <header className="h-20 flex items-center justify-between px-10 border-b border-border/50 z-10 relative">
+        <header className="h-20 flex items-center justify-between px-10 border-b border-[rgba(168,85,247,.12)] z-10 relative">
           <div>
-            <h1 className="text-2xl font-bold text-white">Cấu Hình Module</h1>
-            <p className="text-sm text-text-muted mt-1">Quản lý và thiết lập trạng thái cho các tính năng của Bot.</p>
+            <h1 className="text-2xl font-bold neon-purple">{activeModule === 'overview' ? 'Tổng Quan' : 'Cấu Hình Module'}</h1>
+            <p className="text-sm mt-1" style={{ color: "#8b8499" }}>Điều khiển guild từ một bảng điều khiển.</p>
           </div>
 
           <div className="flex items-center gap-4">
