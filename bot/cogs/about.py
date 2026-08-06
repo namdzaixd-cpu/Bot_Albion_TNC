@@ -19,6 +19,7 @@ FEATURE_FIELDS = [
         "`/sphistory` (lịch sử đóng góp của 1 thành viên)\n"
         "`/sptop` (bảng xếp hạng theo thời gian)\n"
         "`/splog` (audit log upload — Officer)\n"
+        "`/spexport` (xuất file dữ liệu SP — Officer)\n"
         "`/addsp` (cộng điểm tay — Officer)\n"
         "`/removesp` (trừ điểm tay — Officer)\n"
         "`/removesprole` (xóa thành viên khỏi bảng — Officer)\n"

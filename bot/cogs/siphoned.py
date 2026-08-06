@@ -1,4 +1,5 @@
 import asyncio
+import io
 from datetime import datetime, timezone, timedelta
 
 import aiohttp
@@ -354,6 +355,34 @@ class SiphonedCog(commands.Cog):
         embed = discord.Embed(title="📋 Audit Log — SP Transactions", description=desc, color=0xe67e22)
         embed.set_footer(text="Hiển thị tối đa 10 lần upload gần nhất")
         await interaction.followup.send(embed=embed)
+
+    # ── /spexport ──────────────────────────────────────────────────────────────
+    @app_commands.command(name="spexport", description="Xuất toàn bộ dữ liệu SP hiện tại ra file .txt (Officer)")
+    async def spexport(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            return await interaction.response.send_message("❌ Bạn không có quyền!", ephemeral=True)
+        await interaction.response.defer()
+
+        data = load_sp()
+        history = data.get("history", {})
+        last_update = data.get("last_update", "N/A")
+
+        if not history:
+            return await interaction.followup.send("📊 Chưa có dữ liệu SP để xuất.")
+
+        sorted_sp = sorted(history.items(), key=lambda x: x[1], reverse=True)
+
+        lines = ['"Date"\t"Player"\t"Reason"\t"Amount"']
+        for player, sp in sorted_sp:
+            reason = "Withdrawal" if sp < 0 else "Deposit"
+            lines.append(f'"{last_update}"\t"{player}"\t"{reason}"\t"{sp}"')
+
+        content = "\n".join(lines)
+        file = discord.File(io.BytesIO(content.encode("utf-8")), filename="tnc_sp_exportdata.txt")
+        await interaction.followup.send(
+            f"📤 Xuất thành công **{len(sorted_sp)}** thành viên.\nMốc log: `{last_update}`",
+            file=file
+        )
 
     # ── /addsp ─────────────────────────────────────────────────────────────────
     @app_commands.command(name="addsp", description="Cộng tay SP cho một thành viên (Officer)")
