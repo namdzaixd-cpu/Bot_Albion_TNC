@@ -69,3 +69,4 @@ __pycache__/
 # Design docs / specs
 docs/
 backups/
+.ci_venv/
