@@ -513,6 +513,45 @@ class Onboarding(commands.Cog):
         self.config.save()
         await interaction.response.send_message(f"✅ Đã lưu cấu hình Role!", ephemeral=True)
 
+    @onboard_group.command(name="test_onboarding", description="[DEBUG] Bot tự test quy trình onboarding trong forum apply hiện tại")
+    async def onboard_test(self, interaction: discord.Interaction):
+        if not is_officer(interaction.user):
+            await interaction.response.send_message("❌ Chỉ Ban quản trị mới được dùng!", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        apply_id = self.config.apply_channel_id
+        if not apply_id:
+            await interaction.followup.send("❌ Chưa cấu hình apply_channel_id.", ephemeral=True)
+            return
+        forum = self.bot.get_channel(int(apply_id))
+        if not isinstance(forum, discord.ForumChannel):
+            await interaction.followup.send(f"❌ Kênh <#{apply_id}> không phải ForumChannel (type={type(forum).__name__}).", ephemeral=True)
+            return
+        # Tạo thread test
+        thread, _ = await forum.create_thread(
+            name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
+            content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
+            auto_archive_duration=60,
+        )
+        await interaction.followup.send(
+            f"✅ Đã tạo thread test: <#{thread.id}>\n⏳ Đợi onboarding phản hồi 5s...",
+            ephemeral=True,
+        )
+        # Chờ onboarding xử lý
+        await __import__("asyncio").sleep(5)
+        # Kiểm tra thread có tin nhắn của bot không
+        async for msg in thread.history(limit=10):
+            if msg.author == self.bot.user and not msg.content.startswith("[DEBUG]"):
+                await interaction.followup.send(
+                    f"✅ ONBOARDING HOẠT ĐỘNG! Bot đã auto-reply trong thread test.\nNội dung: {msg.content[:200]}",
+                    ephemeral=True,
+                )
+                return
+        await interaction.followup.send(
+            "❌ ONBOARDING KHÔNG PHẢN HỒI. Check log Render để biết lỗi.",
+            ephemeral=True,
+        )
+
 async def setup(bot: commands.Bot):
     cog = Onboarding(bot)
     await bot.add_cog(cog)
