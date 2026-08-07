@@ -835,7 +835,6 @@ class ChatAI(commands.Cog):
                     if reply_text and "[CALL_TOOL: search_chat_history|" in reply_text:
                         print(f"🛠️ Kích hoạt Tool ngầm: {reply_text.strip()}")
                         try:
-                            import re
                             match = re.search(r'\[CALL_TOOL: search_chat_history\|(.*?)\]', reply_text)
                             keywords_str = match.group(1) if match else ""
                             keywords = [k.strip().lower() for k in keywords_str.split(',') if k.strip()]
