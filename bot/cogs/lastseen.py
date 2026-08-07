@@ -29,6 +29,11 @@ class LastSeenCog(commands.Cog):
         except Exception as e:
             print(f"Error loading user_activity from Supabase: {e}")
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # Khởi chạy flush loop trong async context (có event loop sẵn sàng),
+        # tránh lỗi 'loop attribute cannot be accessed in non-async contexts'
+        # khi cog_load chạy trước khi bot.login().
         self.bot.loop.create_task(self._flush_loop())
 
     def save(self):

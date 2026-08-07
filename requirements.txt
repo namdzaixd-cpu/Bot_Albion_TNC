@@ -17,8 +17,8 @@ propcache==0.4.1
 typing_extensions==4.15.0
 Werkzeug==3.1.8
 yarl==1.23.0
-gTTS
-PyNACl
+gtts
+pynacl
 davey
 python-dotenv
 beautifulsoup4==4.12.3
