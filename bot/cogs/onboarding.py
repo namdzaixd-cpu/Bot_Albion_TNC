@@ -527,10 +527,11 @@ class Onboarding(commands.Cog):
         if not isinstance(forum, discord.ForumChannel):
             await interaction.followup.send(f"❌ Kênh <#{apply_id}> không phải ForumChannel (type={type(forum).__name__}).", ephemeral=True)
             return
-        # Tạo thread test
+        # Tạo thread test (phải có content khi tạo thread)
         print(f"DEBUG test_onboarding: tạo thread trong forum {apply_id}")
         thread, _ = await forum.create_thread(
             name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
+            content="[DEBUG] bot tạo thread test, sẽ gửi tin nhắn member giả qua webhook bên dưới.",
             auto_archive_duration=60,
         )
         print(f"DEBUG test_onboarding: tạo thread OK id={thread.id}")
