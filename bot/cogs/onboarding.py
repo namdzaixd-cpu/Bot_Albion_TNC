@@ -527,34 +527,31 @@ class Onboarding(commands.Cog):
         if not isinstance(forum, discord.ForumChannel):
             await interaction.followup.send(f"❌ Kênh <#{apply_id}> không phải ForumChannel (type={type(forum).__name__}).", ephemeral=True)
             return
-        # Tạo thread test (phải có content khi tạo thread)
-        print(f"DEBUG test_onboarding: tạo thread trong forum {apply_id}")
-        thread, _ = await forum.create_thread(
-            name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
-            content="[DEBUG] bot tạo thread test, sẽ gửi tin nhắn member giả qua webhook bên dưới.",
-            auto_archive_duration=60,
-        )
-        print(f"DEBUG test_onboarding: tạo thread OK id={thread.id}")
-        await interaction.followup.send(
-            f"✅ Đã tạo thread test: <#{thread.id}>\n⏳ Gửi tin nhắn member giả qua webhook để kích hoạt onboarding...",
-            ephemeral=True,
-        )
-        # Tạo webhook để gửi tin nhắn giả lập MEMBER (không phải bot) -> kích hoạt on_message
-        webhook = await thread.parent.create_webhook(name="DEBUG-Onboard-Test")
+        # Tạo webhook trong forum, dùng webhook làm OWNER tạo thread + gửi tin nhắn
+        # -> author = webhook = owner thread -> pass check 'message.author.id == channel.owner_id'
+        webhook = await forum.create_webhook(name="DEBUG-Onboard-Test")
         try:
-            await webhook.send(
+            print(f"DEBUG test_onboarding: tạo thread qua webhook trong forum {apply_id}")
+            thread = await webhook.send(
                 content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
                 username="Thanh Vien Test",
-                thread=thread,
+                thread_name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
             )
-            print("DEBUG test_onboarding: đã gửi tin nhắn qua webhook (giả member)")
+            # webhook.send trả về Message của thread vừa tạo
+            thread_obj = thread.channel if hasattr(thread, "channel") else thread
+            print(f"DEBUG test_onboarding: tạo thread OK id={thread_obj.id}")
+            await interaction.followup.send(
+                f"✅ Đã tạo thread test: <#{thread_obj.id}>\n⏳ Chờ onboarding phản hồi 6s...",
+                ephemeral=True,
+            )
+            print("DEBUG test_onboarding: đã gửi tin nhắn qua webhook (webhook = owner thread)")
         finally:
             await webhook.delete()
         # Chờ onboarding xử lý
         await __import__("asyncio").sleep(6)
         # Kiểm tra thread có tin nhắn của bot không
         replied = False
-        async for msg in thread.history(limit=15):
+        async for msg in thread_obj.history(limit=15):
             if msg.author == self.bot.user and not msg.content.startswith("[DEBUG]"):
                 replied = True
                 print(f"DEBUG test_onboarding: ONBOARDING HOẠT ĐỘNG, bot reply: {msg.content[:100]}")
