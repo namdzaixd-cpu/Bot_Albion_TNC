@@ -70,3 +70,9 @@ __pycache__/
 docs/
 backups/
 .ci_venv/
+
+# Temp / junk files (local only, never commit)
+web_dashboard/nul
+supabase/.temp/
+scripts/_diag.sql
+scripts/_diag2.sql

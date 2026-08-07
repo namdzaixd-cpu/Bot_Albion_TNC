@@ -167,3 +167,8 @@ Từ những kinh nghiệm và lịch sử commit, AI phải luôn tuân thủ c
 
 3. **Thẩm mỹ UI/Hình ảnh:**
    - Khi thiết kế giao diện (UI) hoặc tạo sinh/chọn hình ảnh (ví dụ: avatar bot, icon), luôn ưu tiên phong cách tối giản (minimalist), tinh tế, rõ ràng và không rườm rà.
+
+4. **Phân biệt rạch ròi môi trường Local và Production (Render):**
+   - Khi user báo lỗi chung chung (ví dụ: "bot không hoạt động", "bot sập"), LUÔN LUÔN mặc định đó là lỗi trên môi trường Production (Render).
+   - TUYỆT ĐỐI KHÔNG tự ý chạy lệnh khởi động bot ở local để cố gắng tái hiện lỗi production. Việc này vừa vi phạm luật cấm chạy bot local, vừa dẫn đến kết luận sai lệch (ảo giác/hallucinate) do môi trường local chưa cấu hình đủ.
+   - Cách xử lý chuẩn: Dừng lại và yêu cầu user cung cấp **Log mới nhất từ Render** hoặc nhắc nhở user kiểm tra xem đã **Redeploy** sau khi thay đổi biến môi trường hay chưa.
