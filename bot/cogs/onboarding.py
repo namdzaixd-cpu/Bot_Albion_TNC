@@ -545,6 +545,7 @@ class Onboarding(commands.Cog):
             await webhook.send(
                 content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
                 username="Thanh Vien Test",
+                thread_id=thread.id,
             )
             print("DEBUG test_onboarding: đã gửi tin nhắn qua webhook (giả member)")
         finally:
