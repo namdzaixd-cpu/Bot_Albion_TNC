@@ -528,11 +528,13 @@ class Onboarding(commands.Cog):
             await interaction.followup.send(f"❌ Kênh <#{apply_id}> không phải ForumChannel (type={type(forum).__name__}).", ephemeral=True)
             return
         # Tạo thread test
+        print(f"DEBUG test_onboarding: tạo thread trong forum {apply_id}")
         thread, _ = await forum.create_thread(
             name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
             content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
             auto_archive_duration=60,
         )
+        print(f"DEBUG test_onboarding: tạo thread OK id={thread.id}")
         await interaction.followup.send(
             f"✅ Đã tạo thread test: <#{thread.id}>\n⏳ Đợi onboarding phản hồi 5s...",
             ephemeral=True,
@@ -540,17 +542,22 @@ class Onboarding(commands.Cog):
         # Chờ onboarding xử lý
         await __import__("asyncio").sleep(5)
         # Kiểm tra thread có tin nhắn của bot không
+        replied = False
         async for msg in thread.history(limit=10):
             if msg.author == self.bot.user and not msg.content.startswith("[DEBUG]"):
+                replied = True
+                print(f"DEBUG test_onboarding: ONBOARDING HOẠT ĐỘNG, bot reply: {msg.content[:100]}")
                 await interaction.followup.send(
                     f"✅ ONBOARDING HOẠT ĐỘNG! Bot đã auto-reply trong thread test.\nNội dung: {msg.content[:200]}",
                     ephemeral=True,
                 )
                 return
-        await interaction.followup.send(
-            "❌ ONBOARDING KHÔNG PHẢN HỒI. Check log Render để biết lỗi.",
-            ephemeral=True,
-        )
+        if not replied:
+            print("DEBUG test_onboarding: KHÔNG có auto-reply từ bot")
+            await interaction.followup.send(
+                "❌ ONBOARDING KHÔNG PHẢN HỒI. Check log Render để biết lỗi.",
+                ephemeral=True,
+            )
 
 async def setup(bot: commands.Bot):
     cog = Onboarding(bot)
