@@ -531,19 +531,28 @@ class Onboarding(commands.Cog):
         print(f"DEBUG test_onboarding: tạo thread trong forum {apply_id}")
         thread, _ = await forum.create_thread(
             name=f"[DEBUG] test onboarding {int(__import__('time').time())}",
-            content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
             auto_archive_duration=60,
         )
         print(f"DEBUG test_onboarding: tạo thread OK id={thread.id}")
         await interaction.followup.send(
-            f"✅ Đã tạo thread test: <#{thread.id}>\n⏳ Đợi onboarding phản hồi 5s...",
+            f"✅ Đã tạo thread test: <#{thread.id}>\n⏳ Gửi tin nhắn member giả qua webhook để kích hoạt onboarding...",
             ephemeral=True,
         )
+        # Tạo webhook để gửi tin nhắn giả lập MEMBER (không phải bot) -> kích hoạt on_message
+        webhook = await thread.create_webhook(name="DEBUG-Onboard-Test")
+        try:
+            await webhook.send(
+                content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
+                username="Thanh Vien Test",
+            )
+            print("DEBUG test_onboarding: đã gửi tin nhắn qua webhook (giả member)")
+        finally:
+            await webhook.delete()
         # Chờ onboarding xử lý
-        await __import__("asyncio").sleep(5)
+        await __import__("asyncio").sleep(6)
         # Kiểm tra thread có tin nhắn của bot không
         replied = False
-        async for msg in thread.history(limit=10):
+        async for msg in thread.history(limit=15):
             if msg.author == self.bot.user and not msg.content.startswith("[DEBUG]"):
                 replied = True
                 print(f"DEBUG test_onboarding: ONBOARDING HOẠT ĐỘNG, bot reply: {msg.content[:100]}")
