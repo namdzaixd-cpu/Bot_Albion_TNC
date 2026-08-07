@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from core.config import SUPABASE_URL, SUPABASE_KEY
+from core.database import run_blocking
 from supabase import create_client
 import datetime
 
@@ -81,8 +82,8 @@ class ChatLogger(commands.Cog):
 
     async def _insert_log(self, data):
         try:
-            # Insert log âm thầm
-            supabase.table("chat_history").insert(data).execute()
+            # Insert log âm thầm — chạy trong thread pool để KHÔNG nghẽn event loop
+            await run_blocking(lambda: supabase.table("chat_history").insert(data).execute())
         except Exception as e:
             pass # Bỏ qua lỗi ngầm để tránh spam console khi DB lỗi
 

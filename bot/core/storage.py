@@ -1,6 +1,6 @@
 import os
 from .config import BOT_SESSION_ID, GIT_URL
-from .database import supabase
+from .database import supabase, run_blocking
 
 # ==============================================================================
 # CƠ CHẾ CHỐNG MẤT DỮ LIỆU - TỰ ĐỘNG ĐẨY LÊN SUPABASE
@@ -26,7 +26,7 @@ def load_json(path, default):
     return default() if callable(default) else default
 
 def save_json(data, path, sync_github=True):
-    """Lưu dữ liệu vào bảng json_storage trên Supabase."""
+    """Lưu dữ liệu vào bảng json_storage trên Supabase (BLOCKING — chỉ dùng ngoài event loop)."""
     filename = os.path.basename(path)
     try:
         supabase.table("json_storage").upsert(
@@ -34,6 +34,18 @@ def save_json(data, path, sync_github=True):
             on_conflict="file_name"
         ).execute()
         print(f"✅ [Data] Đã lưu {filename} lên Supabase.")
+    except Exception as e:
+        print(f"❌ [Data] Lỗi lưu {filename} lên Supabase: {e}")
+
+async def save_json_async(data, path, sync_github=True):
+    """Lưu dữ liệu vào Supabase NHƯNG chạy trong thread pool — dùng trong command/callback."""
+    filename = os.path.basename(path)
+    try:
+        await run_blocking(lambda: supabase.table("json_storage").upsert(
+            {"file_name": filename, "data": data},
+            on_conflict="file_name"
+        ).execute())
+        print(f"✅ [Data] Đã lưu {filename} lên Supabase (async).")
     except Exception as e:
         print(f"❌ [Data] Lỗi lưu {filename} lên Supabase: {e}")
 

@@ -1,3 +1,5 @@
+import asyncio
+import functools
 import os
 from supabase import create_client, Client
 from .config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
@@ -23,3 +25,13 @@ except Exception as e:
 
 def get_supabase():
     return supabase
+
+
+async def run_blocking(fn, *args):
+    """Chạy 1 hàm BLOCKING (vd: supabase .execute()) trong thread pool
+    để KHÔNG nghẽn event loop của discord.py.
+
+    Dùng: await run_blocking(lambda: supabase.table(...).execute())
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, functools.partial(fn, *args) if args else fn)

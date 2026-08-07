@@ -5,7 +5,7 @@ from datetime import datetime
 import discord
 from discord.ext import commands
 
-from core.database import supabase
+from core.database import supabase, run_blocking
 
 # ==============================================================================
 # HỆ THỐNG FILTER THÀNH VIÊN (LastSeen)
@@ -29,18 +29,18 @@ class LastSeenCog(commands.Cog):
             
         self.bot.loop.create_task(self._flush_loop())
 
-    def save(self):
+    async def save(self):
         if not self.cache: return
         records = []
         for user_id, timestamp in self.cache.items():
             records.append({"user_id": str(user_id), "last_seen": timestamp})
         
         try:
-            # Upsert in chunks
+            # Upsert in chunks — chạy async trong thread pool để không nghẽn event loop
             chunk_size = 1000
             for i in range(0, len(records), chunk_size):
                 chunk = records[i:i+chunk_size]
-                supabase.table("user_activity").upsert(chunk).execute()
+                await run_blocking(lambda: supabase.table("user_activity").upsert(chunk).execute())
         except Exception as e:
             print(f"Error saving user_activity to Supabase: {e}")
 
@@ -49,7 +49,7 @@ class LastSeenCog(commands.Cog):
         while not self.bot.is_closed():
             await asyncio.sleep(300)
             if self.dirty:
-                self.save()
+                await self.save()
                 self.dirty = False
                 print("💾 [LastSeen] Đã lưu xuống Supabase (định kỳ 5 phút).")
 
