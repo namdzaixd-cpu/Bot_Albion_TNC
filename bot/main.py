@@ -7,6 +7,7 @@ from discord.ext import commands
 from core.config import BOT_SESSION_ID, GUILD_ID, TOKEN
 from core.storage import restore_from_github
 from core.webserver import keep_alive
+from core.system_logger import SystemLogger
 
 # ==============================================================================
 # KHỞI TẠO BOT CORE
@@ -24,6 +25,7 @@ EXTENSIONS = [
     "cogs.wiki",
     "cogs.chat_logger",
     "cogs.sync",
+    "cogs.learning",
 ]
 
 
@@ -41,6 +43,9 @@ class TNCBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         synced = await self.tree.sync(guild=guild)
         print(f"✅ Đã sync {len(synced)} slash commands vào guild!")
+        
+        # Bật ghi log hệ thống
+        SystemLogger.start(self)
 
 
 bot = TNCBot()
