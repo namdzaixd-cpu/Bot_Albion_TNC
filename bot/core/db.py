@@ -102,6 +102,8 @@ def safe_select(table: str, *, columns: str = "*",
         if single:
             query = query.maybe_single()
         res = _with_retry(lambda: query.execute())
+        if res is None:
+            return (None, "query_returned_none")
         if getattr(res, "error", None):
             return (None, str(res.error))
         return (res.data, None)
@@ -123,6 +125,8 @@ def safe_upsert(table: str, row: dict, *,
         if on_conflict:
             query = query.on_conflict(on_conflict)
         res = _with_retry(lambda: query.execute())
+        if res is None:
+            return (None, "query_returned_none")
         if getattr(res, "error", None):
             return str(res.error)
         return None
@@ -139,6 +143,8 @@ def safe_insert(table: str, row: dict) -> Optional[str]:
         return "client_unavailable"
     try:
         res = _with_retry(lambda: client.table(table).insert(row).execute())
+        if res is None:
+            return (None, "query_returned_none")
         if getattr(res, "error", None):
             return str(res.error)
         return None
@@ -159,6 +165,8 @@ def safe_update(table: str, row: dict, *,
         for k, v in filters.items():
             query = query.eq(k, v)
         res = _with_retry(lambda: query.execute())
+        if res is None:
+            return (None, "query_returned_none")
         if getattr(res, "error", None):
             return str(res.error)
         return None
@@ -180,6 +188,8 @@ def execute(query_builder: Callable[[Client], Any]) -> tuple[Optional[Any], Opti
         return (None, "client_unavailable")
     try:
         res = _with_retry(lambda: query_builder(client).execute())
+        if res is None:
+            return (None, "query_returned_none")
         if getattr(res, "error", None):
             return (None, str(res.error))
         return (res, None)
