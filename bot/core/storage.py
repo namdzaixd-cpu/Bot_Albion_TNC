@@ -60,6 +60,15 @@ def save_json(data: Any, path: str) -> bool:
     return True
 
 
+async def save_json_async(data: Any, path: str, sync_github: bool = True) -> None:
+    """Alias async của save_json để tương thích cog cũ (vd massing).
+
+    Không chạy threadpool — safe_upsert đã wrap retry/timeout nội bộ,
+    gọi trực tiếp trong event loop là an toàn (đồng bộ với toàn bộ dự án).
+    """
+    save_json(data, path)
+
+
 def restore_from_github() -> None:
     """No-op backward-compatible.
 
