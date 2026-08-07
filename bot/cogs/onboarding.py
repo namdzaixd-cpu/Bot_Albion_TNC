@@ -540,7 +540,7 @@ class Onboarding(commands.Cog):
             ephemeral=True,
         )
         # Tạo webhook để gửi tin nhắn giả lập MEMBER (không phải bot) -> kích hoạt on_message
-        webhook = await thread.channel.create_webhook(name="DEBUG-Onboard-Test")
+        webhook = await thread.parent.create_webhook(name="DEBUG-Onboard-Test")
         try:
             await webhook.send(
                 content="Xin chào, tôi muốn xin gia nhập guild. Ingame: TestBot | Năm sinh: 2000 | Giới tính: nam",
