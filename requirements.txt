@@ -23,4 +23,4 @@ davey
 python-dotenv
 beautifulsoup4==4.12.3
 duckduckgo-search==8.1.1
-supabase
+supabase==2.31.0
