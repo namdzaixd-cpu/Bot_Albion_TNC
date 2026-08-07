@@ -18,15 +18,13 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
-# Backend (bot) ưu tiên SERVICE ROLE KEY để bypass RLS và ghi config an toàn.
-# Fallback các tên biến khác (anon / NEXT_PUBLIC_*) để bot chạy được dù Render set tên nào.
-SUPABASE_KEY = (
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    or os.getenv("SUPABASE_ANON_KEY")
-    or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    or ""
-)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+# Key backend (service_role) — dùng cho bot server-side, bypass RLS.
+# Ưu tiên key này vì bảng json_storage chỉ có policy cho service_role.
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+# Khóa chính dùng để kết nối Supabase từ backend bot (service_role > anon).
+SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY
 
 # Thư mục bot/ — dùng cho file config/template và file tạm
 DATA_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
