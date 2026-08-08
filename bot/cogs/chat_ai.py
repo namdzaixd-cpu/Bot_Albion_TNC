@@ -721,6 +721,35 @@ class ChatAI(commands.Cog):
             return "openrouter:microsoft/phi-3-mini-128k-instruct:free"
         return None  # None = dùng FAILOVER_CHAIN bình thường
 
+    # ── HOOK: câu hỏi "ai mới vào guild / member mới" (tự động query Discord) ──
+    def _detect_newmembers_request(self, content: str) -> int | None:
+        """Trả về số ngày Nếu user hỏi thành viên mới; None nếu không."""
+        c = content.lower()
+        if not any(kw in c for kw in ("mới vào", "thành viên mới", "member mới", "ai mới", "người mới gia nhập", "new member", "join guild", "vào guild")):
+            return None
+        # Parse số ngày nếu có (vd "7 ngày", "30 ngày qua")
+        import re
+        m = re.search(r"(\d+)\s*(ngày|day|d)", c)
+        days = int(m.group(1)) if m else 7
+        return max(1, min(days, 90))
+
+    def _fetch_new_members(self, guild, days: int) -> str:
+        """Query Discord members lọc joined_at >= now - N days. Trả text hoặc thông báo rỗng."""
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        members = []
+        for m in guild.members:
+            j = m.joined_at
+            if j and j >= cutoff:
+                members.append((m.display_name, j))
+        members.sort(key=lambda x: x[1], reverse=True)
+        if not members:
+            return f"(Trong {days} ngày qua không có thành viên mới nào gia nhập guild.)"
+        lines = [f"• {name} — {j.strftime('%d/%m/%Y')}" for name, j in members[:30]]
+        more = "" if len(members) <= 30 else f"\n...và {len(members)-30} người khác"
+        return (f"DANH SÁCH THÀNH VIÊN MỚI TRONG {days} NGÀY QUA ({len(members)} người):\n"
+                + "\n".join(lines) + more)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         # Bỏ qua tin nhắn từ chính bot hoặc các bot khác
@@ -848,6 +877,22 @@ class ChatAI(commands.Cog):
                         # D1: lưu cache để lần sau không gọi model
                         self._save_cached_summary(cache_key, summary_context)
                     # C: route model nếu context dài (xử lý ở bước gọi model)
+
+        # ── HOOK: câu hỏi "ai mới vào guild / member mới" → query Discord trực tiếp ──
+        if not summary_context:
+            nm_days = self._detect_newmembers_request(content)
+            if nm_days and message.guild:
+                try:
+                    nm_text = self._fetch_new_members(message.guild, nm_days)
+                    summary_context = (
+                        f"--- DỮ LIỆU THÀNH VIÊN MỚI (từ Discord) ---\n"
+                        f"{nm_text}\n"
+                        f"--------------------------------------\n\n"
+                        f"Hãy trả lời người dùng dựa trên danh sách trên (nếu trống thì nói không có ai mới). "
+                        f"Không bịa thêm tên nào ngoài danh sách.\n\n"
+                    )
+                except Exception as e:
+                    print(f"[newmembers-hook] Lỗi: {e}")
 
         # Tìm URLs và fetch nội dung
         web_context = ""
