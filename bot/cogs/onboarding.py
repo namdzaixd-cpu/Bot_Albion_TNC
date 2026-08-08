@@ -515,7 +515,7 @@ class Onboarding(commands.Cog):
 
     @onboard_group.command(name="list", description="Xem cấu hình & trạng thái hệ thống Onboarding (Recuibot)")
     async def onboard_list(self, interaction: discord.Interaction):
-        data = get_onboard_data(interaction)
+        data = self.config
         enabled = data.is_enabled
         apply_ch = data.apply_channel_id
         member_r = data.member_role_id
