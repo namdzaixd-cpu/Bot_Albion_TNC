@@ -513,6 +513,56 @@ class Onboarding(commands.Cog):
         self.config.save()
         await interaction.response.send_message(f"✅ Đã lưu cấu hình Role!", ephemeral=True)
 
+    @onboard_group.command(name="list", description="Xem cấu hình & trạng thái hệ thống Onboarding (Recuibot)")
+    async def onboard_list(self, interaction: discord.Interaction):
+        data = get_onboard_data(interaction)
+        enabled = data.is_enabled
+        apply_ch = data.apply_channel_id
+        member_r = data.member_role_id
+        officer_r = data.officer_role_id
+        rules_ch = data.rules_channel_id
+        chat_ch = data.chat_channel_id
+        q_ch = data.question_channel_id
+
+        embed = discord.Embed(title="⚙️ Cấu hình Onboarding (Recuibot)", color=0x3498db)
+        embed.add_field(
+            name="📌 Trạng thái & Kênh",
+            value=(
+                f"🔘 Bật/Tắt: **{'BẬT ✅' if enabled else 'TẮT ❌'}**\n"
+                f"📨 Kênh nộp đơn: {f'<#{apply_ch}>' if apply_ch else '_Chưa cài_'}\n"
+                f"📚 Kênh Rules: {f'<#{rules_ch}>' if rules_ch else '_Chưa cài_'}\n"
+                f"💬 Kênh Chat: {f'<#{chat_ch}>' if chat_ch else '_Chưa cài_'}\n"
+                f"❓ Kênh Q&A: {f'<#{q_ch}>' if q_ch else '_Chưa cài_'}"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="👥 Role",
+            value=(
+                f"🎖️ Officer: {f'<@&{officer_r}>' if officer_r else '_Chưa cài_'}\n"
+                f"🛡️ Member: {f'<@&{member_r}>' if member_r else '_Chưa cài_'}"
+            ),
+            inline=False
+        )
+
+        if apply_ch:
+            try:
+                channel = interaction.guild.get_channel(int(apply_ch)) if interaction.guild else None
+                if channel:
+                    pending = 0
+                    for thread in channel.threads:
+                        if not thread.archived and thread.owner_id != self.bot.user.id:
+                            pending += 1
+                    embed.add_field(
+                        name="📊 Đơn đang chờ duyệt",
+                        value=f"**{pending}** đơn trong kênh nộp đơn",
+                        inline=False
+                    )
+            except Exception as e:
+                print(f"[onboarding-list] Lỗi đếm thread: {e}")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     cog = Onboarding(bot)

@@ -75,7 +75,8 @@ FEATURE_FIELDS = [
         "`/recuibot setup_channels` (tạo bộ kênh tiếp đón — Officer)\n"
         "`/recuibot set_apply_channel` (chọn kênh apply — Officer)\n"
         "`/recuibot setup_roles` (cài đặt role — Officer)\n"
-        "`/recuibot toggle` (bật/tắt tính năng Onboarding — Officer)",
+        "`/recuibot toggle` (bật/tắt tính năng Onboarding — Officer)\n"
+        "`/recuibot list` (xem cấu hình & đơn chờ duyệt — Officer)",
     ),
 ]
 

@@ -23,7 +23,7 @@ web_dashboard/        Dashboard web Next.js (Discord OAuth2)
 | Hệ thống | Lệnh | Mô tả |
 |---|---|---|
 | **About** | `/aboutme` | Giới thiệu bot + link trang web (embed ngắn gọn) |
-| **Onboarding** | `/recuibot setup_channels`, `/recuibot set_apply_channel`, `/recuibot setup_roles`, `/recuibot toggle` | Hệ thống Bot Thư Ký tiếp đón thành viên mới, duyệt đơn qua Forum |
+| **Onboarding** | `/recuibot setup_channels`, `/recuibot set_apply_channel`, `/recuibot setup_roles`, `/recuibot toggle`, `/recuibot list` | Hệ thống Bot Thư Ký tiếp đón thành viên mới, duyệt đơn qua Forum, `/recuibot list` xem cấu hình & đơn chờ |
 | **Siphoned Points** | `/spupdate`, `/spcheck`, `!addsp`, `!removesp`, `!removesprole`, `!resetsp` | Parse file log `.txt` để cộng dồn điểm siphoned theo người chơi, bảng xếp hạng phân trang |
 | **Massing** | `/massing`, `/masstemplatelist`, `/masstemplatedelete` | Tạo party PVP/PVE theo role/weapon, UI nút bấm (join/kick/move/fill), lưu template, tự khôi phục sau restart |
 | **GuildCheck** | `/registertnc`, `/registerfor`, `/myign`, `/guildconfig`, `/guildcheck`, `/unresolved`, `/newmembers [days]` | Đăng ký IGN Albion, tự kiểm tra qua Albion API xem còn trong guild không, tự xóa role nếu đã rời, `/newmembers` liệt kê member mới vào guild qua Discord API (0đ) |
