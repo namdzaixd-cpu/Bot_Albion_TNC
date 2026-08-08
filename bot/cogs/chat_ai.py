@@ -537,6 +537,99 @@ class ChatAI(commands.Cog):
                     raise RuntimeError(data.get("error", f"HTTP {resp.status}"))
                 return data["message"]["content"]
 
+    # ── TÓM TẮT KÊNH CHỦ ĐỘNG ────────────────────────────────────────────────
+    import unicodedata
+
+    def _norm_text(self, s: str) -> str:
+        return "".join(
+            c for c in unicodedata.normalize("NFKD", s)
+            if not unicodedata.combining(c)
+        ).lower()
+
+    def _detect_summary_request(self, content: str, current_channel) -> dict | None:
+        """Phát hiện ý định 'tóm tắt kênh X [từ thời gian Y]'.
+
+        Trả về dict {"channel_query": str, "since_hours": int} hoặc None.
+        """
+        content_lower = content.lower()
+        if not any(kw in content_lower for kw in ("tóm tắt", "tom tat", "summary", "tóm tắt kênh")):
+            return None
+
+        # Xác định khoảng thời gian
+        since_hours = 24  # mặc định "tối hôm qua"
+        if "tuần" in content_lower:
+            since_hours = 168
+        elif "hôm nay" in content_lower:
+            since_hours = 12
+        elif any(k in content_lower for k in ("tối hôm qua", "hôm qua", "tối qua")):
+            since_hours = 24
+
+        # Xác định tên kênh: mention <#id> hoặc text thường
+        import re
+        ch_id = None
+        m = re.search(r"<#(\d+)>", content)
+        if m:
+            ch_id = m.group(1)
+        else:
+            # Tìm tên kênh dạng text: lấy chuỗi giữa "kênh" và "từ"
+            name_m = re.search(r"kênh\s+([^\s@]+)", content_lower)
+            ch_name = name_m.group(1).strip() if name_m else None
+            if ch_name:
+                ch_name = self._norm_text(ch_name)
+                try:
+                    resp, err = execute(lambda c: c.table("discord_channels")
+                                       .select("id,name").limit(1000))
+                    if resp and resp.data:
+                        for row in resp.data:
+                            if ch_name in self._norm_text(row.get("name", "")):
+                                ch_id = str(row["id"])
+                                break
+                except Exception:
+                    pass
+
+        # Fallback: dùng kênh hiện tại nếu không xác định được
+        channel_query = ch_id or (str(current_channel.id) if current_channel else None)
+        return {"channel_query": channel_query, "since_hours": since_hours}
+
+    def _fetch_channel_history(self, channel_query: str, since_hours: int, limit: int = 150) -> str:
+        """Truy vấn Supabase chat_history theo channel_id (ưu tiên) hoặc channel_name."""
+        from datetime import datetime, timezone, timedelta
+        since = (datetime.now(timezone.utc) - timedelta(hours=since_hours)).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z"
+        )
+        try:
+            # Thử theo channel_id trước
+            q = lambda c: (
+                c.table("chat_history")
+                .select("author_name,content,created_at")
+                .eq("channel_id", channel_query)
+                .gte("created_at", since)
+                .order("created_at", desc=False)
+                .limit(limit)
+            )
+            resp, err = execute(q)
+            rows = (resp.data if resp and resp.data else []) if not err else []
+            if not rows:
+                # Fallback: thử theo channel_name (normalize)
+                name_q = self._norm_text(channel_query)
+                resp2, err2 = execute(lambda c: c.table("chat_history")
+                                      .select("author_name,content,created_at")
+                                      .gte("created_at", since)
+                                      .limit(500))
+                if not err2 and resp2 and resp2.data:
+                    rows = [r for r in resp2.data
+                            if name_q in self._norm_text(r.get("channel_name", ""))][:limit]
+            if not rows:
+                return "(Không tìm thấy tin nhắn nào trong khoảng thời gian này.)"
+            lines = []
+            for r in rows:
+                ts = (r.get("created_at") or "")[:16].replace("T", " ")
+                lines.append(f"[{ts}] {r.get('author_name', '?')}: {r.get('content', '')}")
+            return "\n".join(lines)
+        except Exception as e:
+            print(f"[summary] Lỗi truy vấn chat_history: {e}")
+            return "(Không thể lấy dữ liệu lịch sử kênh lúc này.)"
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         # Bỏ qua tin nhắn từ chính bot hoặc các bot khác
@@ -620,6 +713,23 @@ class ChatAI(commands.Cog):
         content = message.content.replace(f'<@{self.bot.user.id}>', '').strip()
         if not content:
             content = "Xin chào!"
+
+        # ── TÓM TẮT KÊNH CHỦ ĐỘNG: truy vấn Supabase trước khi gọi AI ──
+        summary_context = ""
+        summary_req = self._detect_summary_request(content, message.channel)
+        if summary_req and summary_req.get("channel_query"):
+            hist = self._fetch_channel_history(
+                summary_req["channel_query"], summary_req["since_hours"]
+            )
+            if hist:
+                since_label = f"{summary_req['since_hours']}h qua" if summary_req["since_hours"] < 168 \
+                    else "tuần qua"
+                summary_context = (
+                    f"--- LỊCH SỬ KÊNH (từ {since_label}) ---\n"
+                    f"{hist}\n"
+                    f"--------------------------------------\n\n"
+                    f"Hãy tóm tắt ngắn gọn nội dung trên (ai nói gì, chủ đề chính, có drama hay không).\n\n"
+                )
 
         # Tìm URLs và fetch nội dung
         web_context = ""
@@ -768,8 +878,8 @@ class ChatAI(commands.Cog):
         user_info += ": "
 
         # Gộp ngữ cảnh và câu hỏi
-        if guild_info or context_data or reply_context or web_context or library_context:
-            prompt = guild_info + context_data + reply_context + library_context + web_context + f"\n{user_info}" + content
+        if guild_info or context_data or reply_context or web_context or library_context or summary_context:
+            prompt = guild_info + context_data + reply_context + library_context + web_context + summary_context + f"\n{user_info}" + content
         else:
             prompt = f"{user_info}\n" + content
             

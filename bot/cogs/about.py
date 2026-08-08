@@ -65,7 +65,8 @@ FEATURE_FIELDS = [
         "`/ailibrary set_channel` (đặt kênh thư viện — Officer)\n"
         "`/ailibrary scan` (quét thư viện RAG — Officer)\n"
         "`/ailibrary clear` (xóa thư viện RAG — Officer)\n"
-        "`/wiki` (tra cứu Wiki Albion thủ công)",
+        "`/wiki` (tra cứu Wiki Albion thủ công)\n"
+        "💡 **Tóm tắt kênh:** gõ 'tóm tắt kênh <tên/kênh mention> từ <tối hôm qua/hôm nay/tuần này>' — bot tự động lấy lịch sử từ Supabase (không cần quyền đọc kênh)",
     ),
     (
         "👋 Onboarding",
