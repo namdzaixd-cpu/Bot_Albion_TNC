@@ -122,8 +122,7 @@ def safe_upsert(table: str, row: dict, *,
         return "client_unavailable"
     try:
         query = client.table(table).upsert(row)
-        if on_conflict:
-            query = query.on_conflict(on_conflict)
+        # sync client (supabase 2.x) không có .on_conflict(); upsert mặc định đã ghi đè theo PK
         res = _with_retry(lambda: query.execute())
         if res is None:
             return (None, "query_returned_none")
