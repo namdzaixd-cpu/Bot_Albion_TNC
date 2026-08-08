@@ -9,6 +9,7 @@ import io
 import ipaddress
 import socket
 import time
+import unicodedata
 from urllib.parse import urlparse
 try:
     from duckduckgo_search import DDGS
@@ -538,7 +539,6 @@ class ChatAI(commands.Cog):
                 return data["message"]["content"]
 
     # ── TÓM TẮT KÊNH CHỦ ĐỘNG ────────────────────────────────────────────────
-    import unicodedata
 
     def _norm_text(self, s: str) -> str:
         return "".join(
