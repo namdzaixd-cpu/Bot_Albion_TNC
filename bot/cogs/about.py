@@ -35,7 +35,8 @@ FEATURE_FIELDS = [
         "🛡️ GuildCheck",
         "`/guildconfig` (cấu hình GuildCheck — Officer)\n"
         "`/guildcheck` (check tay rời guild — Officer)\n"
-        "`/unresolved` (xem danh sách chưa xác định — Officer)",
+        "`/unresolved` (xem danh sách chưa xác định — Officer)\n"
+        "`/newmembers [days]` (liệt kê thành viên mới vào guild trong N ngày — dùng Discord API, 0đ)",
     ),
     (
         "🔊 Alo (TTS)",

@@ -120,5 +120,40 @@ class GuildCheckCog(commands.Cog):
             
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="newmembers", description="Liệt kê thành viên mới gia nhập guild trong N ngày gần nhất (mặc định 7)")
+    @app_commands.describe(days="Số ngày gần nhất cần lọc (mặc định 7, tối đa 90)")
+    async def newmembers(self, interaction: discord.Interaction, days: int = 7):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            guild = interaction.guild
+            if guild is None:
+                return await interaction.followup.send("❌ Lệnh này chỉ dùng được trong server.")
+            days = max(1, min(days, 90))
+            from datetime import datetime, timezone, timedelta
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+            # Cần Members intent (đã bật Intents.all()) để có joined_at
+            members = []
+            for m in guild.members:
+                j = m.joined_at
+                if j and j >= cutoff:
+                    members.append((m.display_name, j))
+            members.sort(key=lambda x: x[1], reverse=True)
+            if not members:
+                return await interaction.followup.send(
+                    f"📭 Trong {days} ngày qua **không có** thành viên mới nào gia nhập guild."
+                )
+            lines = []
+            for name, j in members[:30]:
+                jd = j.strftime("%d/%m/%Y")
+                lines.append(f"• **{name}** — vào ngày {jd}")
+            more = "" if len(members) <= 30 else f"\n...và {len(members)-30} người khác"
+            await interaction.followup.send(
+                f"🆕 **Thành viên mới trong {days} ngày qua ({len(members)} người):**\n"
+                + "\n".join(lines) + more
+            )
+        except Exception as e:
+            print(f"[newmembers] Lỗi: {e}")
+            await interaction.followup.send(f"❌ Lỗi khi lấy danh sách thành viên mới: `{e}`")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuildCheckCog(bot))
