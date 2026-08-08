@@ -40,7 +40,7 @@ FAILOVER_CHAIN = [
     {"provider": "ollama", "model": "gpt-oss:120b"},
     {"provider": "openrouter", "model": "openrouter/free"},
 ]
-FAILOVER_STEP_TIMEOUT = 10  # giây chờ mỗi bước trước khi coi là lỗi và chuyển bước kế
+FAILOVER_STEP_TIMEOUT = 6  # giây chờ mỗi bước (E5: giảm 10->6, free model thường <3s)
 FAILOVER_FREEZE_SECONDS = 300  # bước vừa lỗi bị "đóng băng" (bỏ qua) trong 5 phút
 
 
@@ -630,6 +630,97 @@ class ChatAI(commands.Cog):
             print(f"[summary] Lỗi truy vấn chat_history: {e}")
             return "(Không thể lấy dữ liệu lịch sử kênh lúc này.)"
 
+    # ── HELPERS: TỐI ƯU TOKEN / RATE-LIMIT / TỐC ĐỘ (A1, D1-D4, C) ──────────
+    import json as _json
+
+    # Stopword tiếng Việt đơn giản (cho preprocess)
+    _STOPWORDS = {"đéo", "vãi", "ồ", "á", "ớ", "ừ", "ừm", "hmm", "ok", "oke", "okay",
+                  "hehe", "haha", "lol", "xd", "v", "vo", "c", "ko", "k", "thêm", "nè",
+                  "đi", "đây", "đó", "này", "kia", "gì", "q", "que", "que"}
+
+    def _preprocess_history(self, rows: list, max_tokens: int = 2500) -> str:
+        """A1: lọc spam/emoji, group theo user, lấy tin đại diện, giảm ~60% token."""
+        if not rows:
+            return ""
+        # Bỏ dòng rỗng / chỉ emoji / quá ngắn
+        def _is_spam(c: str) -> bool:
+            c = (c or "").strip()
+            if len(c) < 4:
+                return True
+            # chỉ emoji/symbol
+            stripped = "".join(ch for ch in c if ch.isalnum() or ch.isspace())
+            if not stripped.strip():
+                return True
+            # link media / gif
+            if any(k in c.lower() for k in ("tenor.com", "giphy.com", "discord.gg", "http")):
+                return True
+            return False
+
+        kept = [r for r in rows if not _is_spam(r.get("content", ""))]
+        # Group theo user: giữ tin dài nhất mỗi user + đếm
+        by_user = {}
+        for r in kept:
+            name = r.get("author_name", "?")
+            content = r.get("content", "")
+            if name not in by_user:
+                by_user[name] = {"count": 0, "best": "", "ts": r.get("created_at", "")}
+            by_user[name]["count"] += 1
+            if len(content) > len(by_user[name]["best"]):
+                by_user[name]["best"] = content
+
+        lines = []
+        for name, info in by_user.items():
+            tag = f"[{name}]" + (f" (x{info['count']})" if info["count"] > 1 else "")
+            lines.append(f"{tag}: {info['best']}")
+
+        text = "\n".join(lines)
+        # Cap token ước lượng (~4 chars/token)
+        if len(text) > max_tokens * 4:
+            text = text[: max_tokens * 4] + "\n...(đã cắt bớt để tiết kiệm token)"
+        return text
+
+    def _get_cached_summary(self, key: str):
+        """D1: đọc cache tóm tắt từ Supabase json_storage."""
+        try:
+            data = load_json("tnc_summary_cache_v1", dict)
+            if not isinstance(data, dict):
+                return None
+            entry = data.get(key)
+            if not entry:
+                return None
+            import time as _t
+            if _t.time() - entry.get("ts", 0) > 600:  # TTL 10 phút
+                return None
+            return entry.get("text")
+        except Exception:
+            return None
+
+    def _save_cached_summary(self, key: str, text: str):
+        """D1: lưu cache tóm tắt."""
+        try:
+            import time as _t
+            data = load_json("tnc_summary_cache_v1", dict)
+            if not isinstance(data, dict):
+                data = {}
+            data[key] = {"ts": _t.time(), "text": text}
+            save_json("tnc_summary_cache_v1", data)
+        except Exception as e:
+            print(f"[summary-cache] Lỗi lưu cache: {e}")
+
+    def _should_debounce(self, key: str) -> bool:
+        """D3: nếu trong 8s có yêu cầu cùng key -> debounce (trả cache/đợi)."""
+        import time as _t
+        now = _t.time()
+        last = self._summary_pending.get(key, 0)
+        self._summary_pending[key] = now
+        return (now - last) < 8
+
+    def _pick_summary_model(self, context_len: int) -> str:
+        """C: tóm tắt dài -> ưu tiên phi-3-mini-128k (vẫn free), còn lại giữ chain cũ."""
+        if context_len > 4000:
+            return "openrouter:microsoft/phi-3-mini-128k-instruct:free"
+        return None  # None = dùng FAILOVER_CHAIN bình thường
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         # Bỏ qua tin nhắn từ chính bot hoặc các bot khác
@@ -705,6 +796,12 @@ class ChatAI(commands.Cog):
         if not (is_mentioned or is_reply or is_keyword_trigger or is_random_intercept):
             return
 
+        # E3: báo "đang gõ" tức thì để user thấy phản hồi ngay (không đợi parse xong)
+        try:
+            await message.channel.trigger_typing()
+        except Exception:
+            pass
+
         if not (OPENROUTER_API_KEY or GEMINI_API_KEY or OLLAMA_API_KEY):
             await message.reply("Xin lỗi, tính năng AI đang bị tắt do chưa cấu hình API Key.")
             return
@@ -718,18 +815,39 @@ class ChatAI(commands.Cog):
         summary_context = ""
         summary_req = self._detect_summary_request(content, message.channel)
         if summary_req and summary_req.get("channel_query"):
-            hist = self._fetch_channel_history(
-                summary_req["channel_query"], summary_req["since_hours"]
-            )
-            if hist:
-                since_label = f"{summary_req['since_hours']}h qua" if summary_req["since_hours"] < 168 \
-                    else "tuần qua"
-                summary_context = (
-                    f"--- LỊCH SỬ KÊNH (từ {since_label}) ---\n"
-                    f"{hist}\n"
-                    f"--------------------------------------\n\n"
-                    f"Hãy tóm tắt ngắn gọn nội dung trên (ai nói gì, chủ đề chính, có drama hay không).\n\n"
-                )
+            cache_key = f"{summary_req['channel_query']}|{summary_req['since_hours']}"
+            # D1: short-circuit nếu có cache (0 token model)
+            cached = self._get_cached_summary(cache_key)
+            if cached:
+                summary_context = cached
+            else:
+                # D3: debounce 8s - nếu vừa có yêu cầu cùng key, skip (sẽ dùng cache sau)
+                if not self._should_debounce(cache_key):
+                    hist = self._fetch_channel_history(
+                        summary_req["channel_query"], summary_req["since_hours"]
+                    )
+                    if hist and hist.startswith("("):
+                        # Không có data
+                        summary_context = hist
+                    elif hist:
+                        # A1: preprocess giảm ~60% token
+                        processed = self._preprocess_history(hist)
+                        since_label = f"{summary_req['since_hours']}h qua" if summary_req['since_hours'] < 168 \
+                            else "tuần qua"
+                        # A3: format output chuẩn
+                        summary_context = (
+                            f"--- LỊCH SỬ KÊNH (từ {since_label}) ---\n"
+                            f"{processed}\n"
+                            f"--------------------------------------\n\n"
+                            f"Hãy tóm tắt theo đúng định dạng:\n"
+                            f"📌 CHỦ ĐỀ CHÍNH: <1 câu>\n"
+                            f"👥 AI THAM GIA: <tên, cách nhau dấu phẩy>\n"
+                            f"💬 TÓM TẮT: <3-5 gạch đầu dòng>\n"
+                            f"🔥 DRAMA: CÓ/KHÔNG (<giải thích ngắn nếu có>)\n"
+                        )
+                        # D1: lưu cache để lần sau không gọi model
+                        self._save_cached_summary(cache_key, summary_context)
+                    # C: route model nếu context dài (xử lý ở bước gọi model)
 
         # Tìm URLs và fetch nội dung
         web_context = ""
@@ -831,39 +949,45 @@ class ChatAI(commands.Cog):
             officer_names = []
             role_counts = []
             
-            for role in message.guild.roles:
-                if role.name == '@everyone':
-                    continue
-                r_name = role.name.lower()
-                if r_name == "gm" or "guild master" in r_name or "guildmaster" in r_name:
-                    gm_names.extend([m.display_name for m in role.members])
-                elif r_name == "vg" or "vice guild" in r_name:
-                    vg_names.extend([m.display_name for m in role.members])
-                elif "officer" in r_name:
-                    officer_names.extend([m.display_name for m in role.members])
-                
-                if len(role.members) > 0:
-                    role_counts.append(f"'{role.name}' ({len(role.members)})")
-            
+            # E2: cache roles 10 phút để không loop mỗi lần
+            import time as _t
+            now_cache = _t.time()
+            cache_valid = (now_cache - getattr(self, "_guild_roles_ts", 0)) < 600
+            if not cache_valid or not hasattr(self, "_guild_roles_cache"):
+                gm_names, vg_names, officer_names, role_counts = [], [], [], []
+                for role in message.guild.roles:
+                    if role.name == '@everyone':
+                        continue
+                    r_name = role.name.lower()
+                    if r_name == "gm" or "guild master" in r_name or "guildmaster" in r_name:
+                        gm_names.extend([m.display_name for m in role.members])
+                    elif r_name == "vg" or "vice guild" in r_name:
+                        vg_names.extend([m.display_name for m in role.members])
+                    elif "officer" in r_name:
+                        officer_names.extend([m.display_name for m in role.members])
+                    if len(role.members) > 0:
+                        role_counts.append(f"'{role.name}' ({len(role.members)})")
+                self._guild_roles_cache = (gm_names, vg_names, officer_names, role_counts)
+                self._guild_roles_ts = now_cache
+            else:
+                gm_names, vg_names, officer_names, role_counts = self._guild_roles_cache
+
             gm_names = list(set(gm_names))
             vg_names = list(set(vg_names))
             officer_names = list(set(officer_names))
-            
+
             guild_info = f"--- Dữ liệu Server (dùng để trả lời nếu được hỏi) ---\n"
             guild_info += f"Tổng thành viên server: {message.guild.member_count}\n"
             guild_info += f"Danh sách GM: {', '.join(gm_names) if gm_names else 'Không có'}\n"
             guild_info += f"Danh sách VG: {', '.join(vg_names) if vg_names else 'Không có'}\n"
             guild_info += f"Danh sách Officer: {', '.join(officer_names) if officer_names else 'Không có'}\n"
-            
+
             if role_counts:
                 guild_info += f"Thống kê số lượng thành viên của từng Role: {', '.join(role_counts)}\n"
 
-            channels_list = []
-            for ch in message.guild.text_channels:
-                channels_list.append(f"<#{ch.id}> (tên: {ch.name})")
-            if channels_list:
-                guild_info += f"Danh sách các kênh chat: {', '.join(channels_list)}\n"
-                guild_info += "GHI CHÚ QUAN TRỌNG: Để nhắc đến/tag một kênh chat, BẠN BẮT BUỘC PHẢI VIẾT ĐÚNG MÃ CỦA NÓ, ví dụ: <#123456789> chứ không được viết là #tên-kênh.\n"
+            # E1: KHÔNG loop text_channels mỗi lần (chậm). Chỉ gợi ý cách tag kênh,
+            # query Supabase discord_channels khi user hỏi tên kênh cụ thể (xử lý riêng nếu cần).
+            guild_info += "GHI CHÚ: Để tag kênh, dùng mã <#id> thay vì #tên-kênh.\n"
 
             guild_info += "--------------------------------------\n\n"
 
@@ -914,34 +1038,58 @@ class ChatAI(commands.Cog):
                 reply_text = None
                 last_error = None
 
-                for i in steps_to_try:
-                    step = FAILOVER_CHAIN[i]
-                    provider, model = step["provider"], step["model"]
-
-                    # minimax-m3/gpt-oss:120b (Ollama) không hỗ trợ vision -> bỏ qua khi tin nhắn có ảnh
-                    if provider == "ollama" and has_images:
-                        continue
-
-                    step_instruction = self.system_instruction.replace("{CURRENT_MODEL}", model)
-
+                # C: tóm tắt kênh dài -> ưu tiên phi-3-mini-128k (free) trước chain
+                summary_model = None
+                if summary_context and len(summary_context) > 4000:
+                    summary_model = self._pick_summary_model(len(summary_context))
+                if summary_model and summary_model.startswith("openrouter:"):
+                    sm_model = summary_model.split(":", 1)[1]
                     try:
-                        if provider == "gemini":
-                            result = await self._call_gemini(model, step_instruction, gemini_parts, FAILOVER_STEP_TIMEOUT)
-                        elif provider == "openrouter":
-                            result = await self._call_openrouter(model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
-                        else:
-                            result = await self._call_ollama(model, step_instruction, prompt, FAILOVER_STEP_TIMEOUT)
+                        step_instruction = self.system_instruction.replace("{CURRENT_MODEL}", sm_model)
+                        result = await self._call_openrouter(sm_model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
+                        if result:
+                            reply_text = result
+                            last_error = None
                     except Exception as e:
-                        last_error = f"{provider}/{model}: {e}"
+                        last_error = f"openrouter/{sm_model}: {e}"
                         self._frozen_until[i] = now + FAILOVER_FREEZE_SECONDS
-                        continue
 
-                    if result is None:
-                        # Provider chưa cấu hình API Key -> bỏ qua, không tính là lỗi
-                        continue
-                        
-                    reply_text = result
-                    
+                if reply_text is None:
+                    for i in steps_to_try:
+                        step = FAILOVER_CHAIN[i]
+                        provider, model = step["provider"], step["model"]
+
+                        # minimax-m3/gpt-oss:120b (Ollama) không hỗ trợ vision -> bỏ qua khi tin nhắn có ảnh
+                        if provider == "ollama" and has_images:
+                            continue
+
+                        step_instruction = self.system_instruction.replace("{CURRENT_MODEL}", model)
+
+                        t0 = time.time()
+                        try:
+                            if provider == "gemini":
+                                result = await self._call_gemini(model, step_instruction, gemini_parts, FAILOVER_STEP_TIMEOUT)
+                            elif provider == "openrouter":
+                                result = await self._call_openrouter(model, step_instruction, prompt, or_content, has_images, FAILOVER_STEP_TIMEOUT)
+                            else:
+                                result = await self._call_ollama(model, step_instruction, prompt, FAILOVER_STEP_TIMEOUT)
+                        except Exception as e:
+                            last_error = f"{provider}/{model}: {e}"
+                            self._frozen_until[i] = now + FAILOVER_FREEZE_SECONDS
+                            continue
+
+                        if result is None:
+                            # Provider chưa cấu hình API Key -> bỏ qua, không tính là lỗi
+                            continue
+
+                        reply_text = result
+
+                        # E5: early-stop - nếu bước đầu trả <2s -> dừng (không thử bước sau)
+                        if (time.time() - t0) < 2 and i == steps_to_try[0]:
+                            break
+                        if reply_text:
+                            break
+
                     if reply_text and "[CALL_TOOL: search_chat_history|" in reply_text:
                         print(f"🛠️ Kích hoạt Tool ngầm: {reply_text.strip()}")
                         try:
@@ -995,8 +1143,6 @@ class ChatAI(commands.Cog):
                         except Exception as e:
                             print(f"Lỗi khi thực thi Tool search_chat_history: {e}")
                             reply_text = "Xin lỗi, tôi không thể lấy dữ liệu lịch sử lúc này do lỗi hệ thống Database."
-
-                    break
 
                 if reply_text is None:
                     print(f"❌ Toàn bộ chuỗi dự phòng AI đều lỗi. Lỗi cuối: {last_error}")

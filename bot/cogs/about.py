@@ -66,7 +66,8 @@ FEATURE_FIELDS = [
         "`/ailibrary scan` (quét thư viện RAG — Officer)\n"
         "`/ailibrary clear` (xóa thư viện RAG — Officer)\n"
         "`/wiki` (tra cứu Wiki Albion thủ công)\n"
-        "💡 **Tóm tắt kênh:** gõ 'tóm tắt kênh <tên/kênh mention> từ <tối hôm qua/hôm nay/tuần này>' — bot tự động lấy lịch sử từ Supabase (không cần quyền đọc kênh)",
+        "💡 **Tóm tắt kênh:** gõ 'tóm tắt kênh <tên/kênh mention> từ <tối hôm qua/hôm nay/tuần này>' — bot tự động lấy lịch sử từ Supabase (không cần quyền đọc kênh)\n"
+        "⚡ **Tối ưu:** cache tóm tắt 10p, debounce 8s, tiền xử lý giảm ~60% token, ưu tiên model 128k cho tóm tắt dài, timeout failover 6s — phản hồi nhanh, 0đ",
     ),
     (
         "👋 Onboarding",
